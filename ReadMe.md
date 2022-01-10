@@ -6,14 +6,18 @@
 
 [Build Instructions](_dev/build.md)
 
-## Clients
+## Prerequisites
 
-[vscode-opencl](https://github.com/Galarius/vscode-opencl)
+OpenCL Language Server requires OpenCL Runtime [[Intel](https://software.intel.com/en-us/articles/opencl-drivers), [NVidia](http://www.nvidia.com/Download/index.aspx), [AMD](http://support.amd.com/en-us/download)]
 
 ## Dependencies
 
 * [Catch2](https://github.com/catchorg/Catch2.git)
 * [Boost.Json](https://github.com/boostorg/json.git)
+
+## Clients
+
+[vscode-opencl](https://github.com/Galarius/vscode-opencl)
 
 ## License
 
