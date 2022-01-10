@@ -17,7 +17,7 @@
 
 ## License
 
-[MIT License](https://raw.githubusercontent.com/Galarius/opencl-language-server/master/LICENSE.txt)
+[MIT License](https://raw.githubusercontent.com/Galarius/opencl-language-server/main/LICENSE.txt)
 
 ## Disclaimer
 
