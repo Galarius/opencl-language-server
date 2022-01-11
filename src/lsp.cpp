@@ -122,7 +122,7 @@ void LSPServer::OnInitialize(const json::object& data)
              {"change", 1}, // TextDocumentSyncKind.Full
              {"willSave", false},
              {"willSaveWaitUntil", false},
-             {"save", {{"includeText", false}}},
+             {"save", false},
          }},
     });
     m_outQueue.push(json::object(
