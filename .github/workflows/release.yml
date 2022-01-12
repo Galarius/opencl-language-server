@@ -1,0 +1,128 @@
+# GitHub Actions: Automated multi-platform releases of opencl-language-server
+name: Release
+on:
+  push:
+    tags:
+      - '[0-9]+.*'
+env:
+  BUILD_TYPE: Release
+
+jobs:
+  create_release:
+      name: Create Release
+      runs-on: ubuntu-latest
+      outputs:
+        upload_url: ${{steps.create_release.outputs.upload_url}}
+      steps:
+        - name: Create release
+          id: create_release
+          uses: actions/create-release@v1
+          env:
+            GITHUB_TOKEN: ${{github.token}}
+          with:
+            tag_name: ${{github.ref}}
+            release_name: Release ${{github.ref}}
+            draft: true 
+            prerelease: false
+  
+  build_release:
+    name: Build Release
+    runs-on: ${{ matrix.config.os }}
+    needs: create_release
+    strategy:
+      matrix:
+        config:
+          - os: ubuntu-latest
+          - os: macos-latest
+          - os: windows-latest
+
+    steps:
+    - uses: actions/checkout@v2
+        
+    - name: Clone submodules
+      run: git submodule update --init
+
+    - name: Install OpenCL (Linux)
+      if: "contains(matrix.config.os, 'ubuntu')"
+      run: sudo apt-get install ocl-icd-opencl-dev opencl-headers
+
+    - name: Prerequisites (Windows)
+      uses: microsoft/setup-msbuild@v1.1
+      if: "contains(matrix.config.os, 'windows')"
+
+    - name: Install OpenCL (Windows)
+      if: "contains(matrix.config.os, 'windows')"
+      run: |
+        git clone https://github.com/KhronosGroup/OpenCL-Headers.git 
+        cd OpenCL-Headers 
+        cmake -S . -B build -DCMAKE_INSTALL_PREFIX=${{github.workspace}}/opencl
+        cmake --build build --target install
+        cd ${{github.workspace}}
+        git clone https://github.com/KhronosGroup/OpenCL-ICD-Loader
+        mv -v ${{github.workspace}}/opencl/include/* ${{github.workspace}}/OpenCL-ICD-Loader/inc
+        cd ${{github.workspace}}/OpenCL-ICD-Loader
+        mkdir build && cd build
+        cmake ..
+        msbuild OpenCL.vcxproj -property:Configuration=${{env.BUILD_TYPE}}
+        
+    - name: Configure CMake (MacOS | Linux)
+      if: "!contains(matrix.config.os, 'windows')"
+      run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
+
+    - name: Configure CMake (Windows)
+      if: "contains(matrix.config.os, 'windows')"
+      run: cmake -B ${{github.workspace}}/build -DOpenCL_FOUND=True -DOpenCL_LIBRARY=${{github.workspace}}/OpenCL-ICD-Loader/build/Release/OpenCL.lib -DOpenCL_LIBRARIES=${{github.workspace}}/OpenCL-ICD-Loader/build/Release/OpenCL.lib -DOpenCL_INCLUDE_DIR=${{github.workspace}}/OpenCL-ICD-Loader/inc
+
+    - name: Build
+      run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}}
+
+    - name: Archive Artifact (MacOS)
+      if: "contains(matrix.config.os, 'macos')"
+      run: | 
+        cd ${{github.workspace}}/build/bin/
+        tar -czvf opencl-language-server-darwin-x86_64.tar.gz opencl-language-server
+
+    - name: Archive Artifact (Linux)
+      if: "contains(matrix.config.os, 'ubuntu')"
+      run: |
+        cd ${{github.workspace}}/build/bin/ 
+        tar -czvf opencl-language-server-linux-x86_64.tar.gz opencl-language-server
+      
+    - name: Archive Artifact (Windows)
+      if: "contains(matrix.config.os, 'windows')"
+      run: | 
+        cd ${{github.workspace}}/build/bin/Release/
+        7z a -tzip opencl-language-server-win32-x86_64.zip opencl-language-server.exe
+          
+    - name: Upload Artifact (MacOS)
+      if: "contains(matrix.config.os, 'macos')"
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{github.token}}
+      with:
+        upload_url: ${{needs.create_release.outputs.upload_url}}
+        asset_path: ${{github.workspace}}/build/bin/opencl-language-server-darwin-x86_64.tar.gz
+        asset_name: opencl-language-server-darwin-x86_64.tar.gz
+        asset_content_type: application/gzip
+        
+    - name: Upload Artifact (Linux)
+      if: "contains(matrix.config.os, 'ubuntu')"
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{github.token}}
+      with:
+        upload_url: ${{needs.create_release.outputs.upload_url}}
+        asset_path: ${{github.workspace}}/build/bin/opencl-language-server-linux-x86_64.tar.gz
+        asset_name: opencl-language-server-linux-x86_64.tar.gz
+        asset_content_type: application/gzip
+
+    - name: Upload Artifact (Windows)
+      if: "contains(matrix.config.os, 'windows')"
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{github.token}}
+      with:
+        upload_url: ${{needs.create_release.outputs.upload_url}}
+        asset_path: ${{github.workspace}}/build/bin/Release/opencl-language-server-win32-x86_64.zip
+        asset_name: opencl-language-server-win32-x86_64.zip
+        asset_content_type: application/zip
