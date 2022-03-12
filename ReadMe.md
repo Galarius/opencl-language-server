@@ -15,6 +15,21 @@ OpenCL Language Server requires OpenCL Runtime [[Intel](https://software.intel.c
 * [Catch2](https://github.com/catchorg/Catch2.git)
 * [Boost.Json](https://github.com/boostorg/json.git)
 
+## Parameters
+
+To enable server logging, pass the following options on the startup: `--enable-file-tracing --filename <path to the log file> --level <0-4>`
+
+You can also configure diagnostics with json-rpc request during the intitialization:
+
+```json
+"initializationOptions": {
+    "configuration": {
+        "buildOptions": [],
+        "maxNumberOfProblems": 100
+    }
+}
+```
+
 ## Clients
 
 [vscode-opencl](https://github.com/Galarius/vscode-opencl)
