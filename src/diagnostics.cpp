@@ -76,7 +76,7 @@ public:
 
 private:
     boost::json::array BuildDiagnostics(const std::string& buildLog, const std::string& name);
-    std::string BuildSource(const std::string& source, const std::string& dir) const;
+    std::string BuildSource(const std::string& source) const;
 
 private:
     bool m_isInitialized = false;
@@ -170,19 +170,16 @@ Diagnostics::Diagnostics()
     m_isInitialized = true;
 }
 
-std::string Diagnostics::BuildSource(const std::string& source, const std::string& dir) const
+std::string Diagnostics::BuildSource(const std::string& source) const
 {
     std::vector<cl::Device> ds {m_device};
     cl::Context context(ds, NULL, NULL, NULL);
     cl::Program program;
-    std::string options = m_BuildOptions;
-    if (!dir.empty())
-        options += "-I " + dir;
     try
     {
-        GLogDebug(TracePrefix, "Building program with options: ", options);
+        GLogDebug(TracePrefix, "Building program with options: ", m_BuildOptions);
         program = cl::Program(context, source, false);
-        program.build(ds, options.c_str());
+        program.build(ds, m_BuildOptions.c_str());
     }
     catch (cl::Error& err)
     {
@@ -255,16 +252,14 @@ boost::json::array Diagnostics::Get(const Source& source)
 
     std::string buildLog;
     std::string srcName;
-    std::string kernelDir;
 
     if (!source.filePath.empty())
     {
         auto filePath = std::filesystem::path(source.filePath).string();  
         srcName = std::filesystem::path(filePath).filename().string();
-        kernelDir = std::filesystem::path(filePath).parent_path().string();
     }
 
-    buildLog = BuildSource(source.text, kernelDir);
+    buildLog = BuildSource(source.text);
     GLogTrace(TracePrefix, "BuildLog:\n", buildLog);
 
     return BuildDiagnostics(buildLog, srcName);
