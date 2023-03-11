@@ -6,6 +6,7 @@
 //
 
 #include "diagnostics.hpp"
+#include "opencl.hpp"
 #include "utils.hpp"
 
 #include <iostream>
@@ -14,16 +15,6 @@
 
 #include <glogger.hpp>
 #include <filesystem.hpp>
-
-#define __CL_ENABLE_EXCEPTIONS
-#pragma warning(push, 0)
-#if defined(__APPLE__) || defined(__MACOSX) || defined(WIN32)
-    #include "opencl/cl.hpp"
-#else
-    #include <CL/cl.hpp>
-#endif
-#pragma warning(pop)
-
 
 using namespace boost;
 

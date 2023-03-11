@@ -8,6 +8,7 @@
 #include "utils.hpp"
 #include <glogger.hpp>
 
+#include <algorithm>
 #include <functional>
 #include <sstream>
 #include <random>
@@ -87,5 +88,48 @@ std::string UriToPath(const std::string& uri)
     }
     return uri;
 }
+
+bool EndsWith(const std::string& str, const std::string& suffix)
+{
+    return str.size() >= suffix.size() && 0 == str.compare(str.size() - suffix.size(), suffix.size(), suffix);
+}
+
+void RemoveNullTerminator(std::string& str)
+{
+    if (EndsWith(str, "\0"))
+    {
+        str.pop_back();
+    }
+}
+
+namespace internal {
+// Generates a lookup table for the checksums of all 8-bit values.
+std::array<std::uint_fast32_t, 256> GenerateCRCLookupTable()
+{
+    auto const reversed_polynomial = std::uint_fast32_t {0xEDB88320uL};
+
+    // This is a function object that calculates the checksum for a value,
+    // then increments the value, starting from zero.
+    struct byte_checksum
+    {
+        std::uint_fast32_t operator()() noexcept
+        {
+            auto checksum = static_cast<std::uint_fast32_t>(n++);
+
+            for (auto i = 0; i < 8; ++i)
+                checksum = (checksum >> 1) ^ ((checksum & 0x1u) ? reversed_polynomial : 0);
+
+            return checksum;
+        }
+
+        unsigned n = 0;
+    };
+
+    auto table = std::array<std::uint_fast32_t, 256> {};
+    std::generate(table.begin(), table.end(), byte_checksum {});
+
+    return table;
+}
+} // namespace internal
 
 } // namespace vscode::opencl::utils
