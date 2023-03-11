@@ -8,6 +8,7 @@
 #include <iostream>
 
 #include "lsp.hpp"
+#include "clinfo.hpp"
 
 #define __glogger_implementation__ // define this only once
 #include <glogger.hpp>
@@ -36,6 +37,14 @@ int main(int argc, char* argv[])
     if(isArgOption(argv, argv + argc, "--version"))
     {
         std::cout << VERSION << std::endl;
+        exit(0);
+    }
+    
+    if(isArgOption(argv, argv + argc, "--clinfo"))
+    {
+        auto clinfo = CreateCLInfo();
+        auto jsonBody = clinfo->json();
+        std::cout << boost::json::serialize(boost::json::value_from(jsonBody)) << std::endl;
         exit(0);
     }
     
