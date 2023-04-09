@@ -6,7 +6,6 @@
 //
 
 #include "clinfo.hpp"
-#include "opencl.hpp"
 #include "utils.hpp"
 
 #include <array>
@@ -364,14 +363,18 @@ uint32_t CalculateDeviceID(const cl::Device& device)
 {
     try
     {
-        const auto name = device.getInfo<CL_DEVICE_NAME>();
-        const auto type = device.getInfo<CL_DEVICE_TYPE>();
-        const auto version = device.getInfo<CL_DEVICE_VERSION>();
-        const auto vendor = device.getInfo<CL_DEVICE_VENDOR>();
-        const auto vendorID = device.getInfo<CL_DEVICE_VENDOR_ID>();
-        const auto driverVersion = device.getInfo<CL_DRIVER_VERSION>();
-        const auto identifier =
-            name + std::to_string(type) + version + vendor + std::to_string(vendorID) + driverVersion;
+        auto name = device.getInfo<CL_DEVICE_NAME>();
+        auto type = device.getInfo<CL_DEVICE_TYPE>();
+        auto version = device.getInfo<CL_DEVICE_VERSION>();
+        auto vendor = device.getInfo<CL_DEVICE_VENDOR>();
+        auto vendorID = device.getInfo<CL_DEVICE_VENDOR_ID>();
+        auto driverVersion = device.getInfo<CL_DRIVER_VERSION>();
+        auto identifier = std::move(name)
+                        + std::to_string(type)
+                        + std::move(version)
+                        + std::move(vendor)
+                        + std::to_string(vendorID)
+                        + std::move(driverVersion);
         return CRC32(identifier.begin(), identifier.end());
     }
     catch (const cl::Error& err)
@@ -478,6 +481,32 @@ public:
         }
 
         return json::object {{"PLATFORMS", jsonPlatforms}};
+    }
+        
+    uint32_t GetDeviceID(const cl::Device& device)
+    {
+        return CalculateDeviceID(device);
+    }
+
+    std::string GetDeviceDescription(const cl::Device& device)
+    {
+        auto name = device.getInfo<CL_DEVICE_NAME>();
+        auto type = device.getInfo<CL_DEVICE_TYPE>();
+        auto version = device.getInfo<CL_DEVICE_VERSION>();
+        auto vendor = device.getInfo<CL_DEVICE_VENDOR>();
+        auto vendorID = device.getInfo<CL_DEVICE_VENDOR_ID>();
+        auto driverVersion = device.getInfo<CL_DRIVER_VERSION>();
+        RemoveNullTerminator(name);
+        RemoveNullTerminator(version);
+        RemoveNullTerminator(vendor);
+        RemoveNullTerminator(driverVersion);
+        auto description = "name: " + std::move(name) + "; "
+                         + "type: " + std::to_string(type) + "; "
+                         + "version: " + std::move(version) + "; "
+                         + "vendor: " + std::move(vendor) + "; "
+                         + "vendorID: " + std::to_string(vendorID) + "; "
+                         + "driverVersion: " + std::move(driverVersion);
+        return description;
     }
 };
 

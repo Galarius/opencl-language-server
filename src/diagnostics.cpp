@@ -12,6 +12,8 @@
 #include <iostream>
 #include <stdexcept> // std::runtime_error, std::invalid_argument
 #include <regex>
+#include <optional>
+#include <tuple>
 
 #include <glogger.hpp>
 #include <filesystem.hpp>
@@ -44,14 +46,12 @@ std::tuple<std::string, long, long, long, std::string> ParseOutput(const std::sm
     return std::make_tuple(std::move(source), line, col, severity, std::move(message));
 }
 
-struct OpenCLDevice
+size_t GetDevicePowerIndex(const cl::Device& device)
 {
-    size_t maxComputeUnits = 0;
-    size_t maxClockFrequency = 0;
-    std::string devName;
-    std::string devVer;
-    std::string drvVer;
-};
+    const size_t maxComputeUnits = device.getInfo<CL_DEVICE_MAX_COMPUTE_UNITS>();
+    const size_t maxClockFrequency = device.getInfo<CL_DEVICE_MAX_CLOCK_FREQUENCY>();
+    return maxComputeUnits * maxClockFrequency;
+}
 
 } // namespace
 
@@ -60,24 +60,32 @@ namespace vscode::opencl {
 class Diagnostics : public IDiagnostics
 {
 public:
-    Diagnostics();
-    boost::json::array Get(const Source& source);
+    explicit Diagnostics(std::shared_ptr<ICLInfo> clInfo);
+
     void SetBuildOptions(const boost::json::array& options);
     void SetMaxProblemsCount(int maxNumberOfProblems);
+    void SetOpenCLDevice(uint32_t identifier);
+    boost::json::array Get(const Source& source);
 
 private:
     boost::json::array BuildDiagnostics(const std::string& buildLog, const std::string& name);
     std::string BuildSource(const std::string& source) const;
 
 private:
-    bool m_isInitialized = false;
-    cl::Device m_device;
+    std::shared_ptr<ICLInfo> m_clInfo;
+    std::optional<cl::Device> m_device;
     std::regex m_regex {"^(.*):(\\d+):(\\d+): ((fatal )?error|warning|Scholar): (.*)$"};
     std::string m_BuildOptions;
     int m_maxNumberOfProblems = 100;
 };
 
-Diagnostics::Diagnostics()
+Diagnostics::Diagnostics(std::shared_ptr<ICLInfo> clInfo)
+    : m_clInfo { std::move(clInfo) }
+{
+    SetOpenCLDevice(0);
+}
+
+void Diagnostics::SetOpenCLDevice(uint32_t identifier)
 {
     GLogTrace(TracePrefix, "Selecting OpenCL platform...");
     std::vector<cl::Platform> platforms;
@@ -92,78 +100,69 @@ Diagnostics::Diagnostics()
 
     GLogInfo(TracePrefix, "Found OpenCL platforms: ", platforms.size());
     if(platforms.size() == 0)
+    {
         return;
-
-    cl::Platform platform = platforms.front();
-    std::vector<cl::Device> devices;
-
-    try
-    {
-        platform.getDevices(CL_DEVICE_TYPE_ALL, &devices);
     }
-    catch (cl::Error& err)
-    {
-        GLogError(TracePrefix, "No OpenCL devices were found, ", err.what(), " (", err.err(), ")");
-    }
-
-    GLogInfo(TracePrefix, "Found OpenCL devices: ", devices.size());
-    if(devices.size() == 0)
-        return;
-
-    size_t powerIndex = 0, maxPowerIndex = 0;
-    GLogTrace(TracePrefix, "Selecting OpenCL device (total:", devices.size(), ")...");
-    std::vector<OpenCLDevice> devsData;
-    devsData.reserve(devices.size());
-    for (auto& device : devices)
-    {
-        OpenCLDevice data;
+    
+    std::string description;
+    std::optional<cl::Device> selectedDevice;
+    for (auto& platform : platforms) {
+        std::vector<cl::Device> devices;
         try
         {
-            device.getInfo(CL_DEVICE_MAX_COMPUTE_UNITS, &data.maxComputeUnits);
-            device.getInfo(CL_DEVICE_MAX_CLOCK_FREQUENCY, &data.maxClockFrequency);
-            device.getInfo(CL_DEVICE_NAME, &data.devName);
-            device.getInfo(CL_DEVICE_VERSION, &data.devVer);
-            device.getInfo(CL_DRIVER_VERSION, &data.drvVer);
-            powerIndex = data.maxComputeUnits * data.maxClockFrequency;
-            devsData.push_back(data);
+            platform.getDevices(CL_DEVICE_TYPE_ALL, &devices);
         }
         catch (cl::Error& err)
         {
-            GLogWarn(TracePrefix, "Failed to get info for a device, ", err.what(), " (", err.err(), ")");
-            continue;
+            GLogError(TracePrefix, "No OpenCL devices were found, ", err.what(), " (", err.err(), ")");
         }
-
-        GLogDebug(
-            TracePrefix,
-            "Found device:\n",
-            "Device name:",
-            data.devName,
-            "\n",
-            "OpenCL version:",
-            data.devVer,
-            "\n",
-            "Driver version:",
-            data.drvVer,
-            "\n",
-            "Max compute units:",
-            data.maxComputeUnits,
-            "\n",
-            "Max clock frequency:",
-            data.maxClockFrequency,
-            "\n");
-        if (powerIndex > maxPowerIndex)
+        GLogInfo(TracePrefix, "Found OpenCL devices: ", devices.size());
+        if(devices.size() == 0)
         {
-            maxPowerIndex = powerIndex;
-            m_device = device;
-            GLogDebug(TracePrefix, "Selected OpenCL device: ", data.devName);
+            return;
+        }
+        
+        size_t maxPowerIndex = 0;
+        GLogTrace(TracePrefix, "Selecting OpenCL device (total:", devices.size(), ")...");
+        for (auto& device : devices)
+        {
+            size_t powerIndex = 0;
+            try
+            {
+                description = m_clInfo->GetDeviceDescription(device);
+                auto deviceID = m_clInfo->GetDeviceID(device);
+                if(identifier == deviceID) {
+                    selectedDevice = device;
+                    break;
+                } else {
+                    powerIndex = GetDevicePowerIndex(device);
+                }
+            }
+            catch (cl::Error& err)
+            {
+                GLogWarn(TracePrefix, "Failed to get info for a device, ", err.what(), " (", err.err(), ")");
+                continue;
+            }
+            
+            if (powerIndex > maxPowerIndex)
+            {
+                maxPowerIndex = powerIndex;
+                selectedDevice = device;
+            }
         }
     }
-    m_isInitialized = true;
+    m_device = selectedDevice;
+    GLogInfo(TracePrefix, "Selected OpenCL device: ", description);
 }
 
 std::string Diagnostics::BuildSource(const std::string& source) const
 {
-    std::vector<cl::Device> ds {m_device};
+    if(!m_device.has_value())
+    {
+        throw std::runtime_error("missing OpenCL device");
+    }
+    
+    std::vector<cl::Device> ds { *m_device };
     cl::Context context(ds, NULL, NULL, NULL);
     cl::Program program;
     try
@@ -184,7 +183,7 @@ std::string Diagnostics::BuildSource(const std::string& source) const
 
     try
     {
-        program.getBuildInfo(m_device, CL_PROGRAM_BUILD_LOG, &build_log);
+        program.getBuildInfo(*m_device, CL_PROGRAM_BUILD_LOG, &build_log);
     }
     catch (cl::Error& err)
     {
@@ -237,10 +236,12 @@ boost::json::array Diagnostics::BuildDiagnostics(const std::string& buildLog, co
 
 boost::json::array Diagnostics::Get(const Source& source)
 {
+    if(!m_device.has_value())
+    {
+        throw std::runtime_error("missing OpenCL device");
+    }
+    
     GLogDebug(TracePrefix, "Getting diagnostics...");
-    if (!m_isInitialized)
-        throw std::runtime_error("Failed to init OpenCL");
-
     std::string buildLog;
     std::string srcName;
 
@@ -281,9 +282,9 @@ void Diagnostics::SetMaxProblemsCount(int maxNumberOfProblems)
     m_maxNumberOfProblems = maxNumberOfProblems;
 }
 
-std::shared_ptr<IDiagnostics> CreateDiagnostics()
+std::shared_ptr<IDiagnostics> CreateDiagnostics(std::shared_ptr<ICLInfo> clInfo)
 {
-    return std::shared_ptr<IDiagnostics>(new Diagnostics());
+    return std::make_shared<Diagnostics>(std::move(clInfo));
 }
 
 } // namespace vscode::opencl

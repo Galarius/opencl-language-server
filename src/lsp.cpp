@@ -31,7 +31,7 @@ class LSPServer
     , public std::enable_shared_from_this<LSPServer>
 {
 public:
-    LSPServer() : m_diagnostics(CreateDiagnostics()) {}
+    LSPServer() : m_diagnostics(CreateDiagnostics(CreateCLInfo())) {}
 
     void Run();
 
@@ -66,6 +66,7 @@ void LSPServer::GetConfiguration()
     GLogDebug(TracePrefix, "Make configuration request");
     json::object buildOptions({{"section", "OpenCL.server.buildOptions"}});
     json::object maxNumberOfProblems({{"section", "OpenCL.server.maxNumberOfProblems"}});
+    json::object openCLDeviceID({{"section", "OpenCL.server.deviceID"}});
     const auto requestId = utils::GenerateId();
     m_requests.push(std::make_pair("workspace/configuration", requestId));
     // clang-format off
@@ -74,7 +75,7 @@ void LSPServer::GetConfiguration()
             {"id", requestId},
             {"method", "workspace/configuration"},
             {"params", {
-                {"items", json::array({buildOptions, maxNumberOfProblems})}
+                {"items", json::array({buildOptions, maxNumberOfProblems, openCLDeviceID})}
             }}
         }
     ));
@@ -97,17 +98,19 @@ void LSPServer::OnInitialize(const json::object& data)
                                                            .at("workspace").as_object()
                                                            .at("didChangeConfiguration").as_object()
                                                            .at("dynamicRegistration").as_bool();
-        auto buildOptions = data.at("params").as_object()
+        auto configuration = data.at("params").as_object()
                                 .at("initializationOptions").as_object()
-                                .at("configuration").as_object()
-                                .at("buildOptions").as_array();
-        auto maxNumberOfProblems = data.at("params").as_object()
-                                .at("initializationOptions").as_object()
-                                .at("configuration").as_object()
-                                .at("maxNumberOfProblems").as_int64();
+                                .at("configuration").as_object();
         // clang-format on
+
+        auto buildOptions = configuration.at("buildOptions").as_array();
         m_diagnostics->SetBuildOptions(buildOptions);
+
+        auto maxNumberOfProblems = configuration.at("maxNumberOfProblems").as_int64();
         m_diagnostics->SetMaxProblemsCount(static_cast<int>(maxNumberOfProblems));
+
+        auto deviceID = configuration.at("deviceID").as_int64();
+        m_diagnostics->SetOpenCLDevice(static_cast<uint32_t>(deviceID));
     }
     catch (std::exception& err)
     {
@@ -237,7 +240,7 @@ void LSPServer::OnConfiguration(const json::object& data)
         return;
     }
 
-    if (result.size() != 2)
+    if (result.size() != 3)
     {
         GLogWarn(TracePrefix, "Unexpected result items count");
         return;
@@ -246,9 +249,13 @@ void LSPServer::OnConfiguration(const json::object& data)
     try
     {
         auto buildOptions = result.at(0).as_array();
-        auto maxProblemsCount = result.at(1).as_int64();
         m_diagnostics->SetBuildOptions(buildOptions);
+
+        auto maxProblemsCount = result.at(1).as_int64();
         m_diagnostics->SetMaxProblemsCount(static_cast<int>(maxProblemsCount));
+        
+        auto deviceID = result.at(2).as_int64();
+        m_diagnostics->SetOpenCLDevice(static_cast<uint32_t>(deviceID));
     }
     catch (std::exception& err)
     {
