@@ -252,6 +252,7 @@ boost::json::array Diagnostics::Get(const Source& source)
     }
 
     buildLog = BuildSource(source.text);
+    utils::RemoveNullTerminator(buildLog);
     GLogTrace(TracePrefix, "BuildLog:\n", buildLog);
 
     return BuildDiagnostics(buildLog, srcName);
