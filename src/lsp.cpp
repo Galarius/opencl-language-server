@@ -154,9 +154,9 @@ void LSPServer::OnInitialized(const json::object& data)
         {"id", utils::GenerateId()},
         {"method", "workspace/didChangeConfiguration"},
     }});
-    json::array params({{
+    json::object params({
         {"registrations", registrations},
-    }});
+    });
     m_outQueue.push(json::object(
         {
             {"id", utils::GenerateId()},
