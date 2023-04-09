@@ -18,13 +18,13 @@
 #pragma warning(pop)
 
 #ifndef VERSION
-#error version is required
+    #error version is required
 #endif
 
-#if defined(WIN32)    
-#include <stdio.h>
-#include <fcntl.h>
-#include <io.h>
+#if defined(WIN32)
+    #include <stdio.h>
+    #include <fcntl.h>
+    #include <io.h>
 #endif
 
 using namespace vscode::opencl;
@@ -34,20 +34,20 @@ char* getArgOption(char** begin, char** end, const char* option);
 
 int main(int argc, char* argv[])
 {
-    if(isArgOption(argv, argv + argc, "--version"))
+    if (isArgOption(argv, argv + argc, "--version"))
     {
         std::cout << VERSION << std::endl;
         exit(0);
     }
-    
-    if(isArgOption(argv, argv + argc, "--clinfo"))
+
+    if (isArgOption(argv, argv + argc, "--clinfo"))
     {
         auto clinfo = CreateCLInfo();
         auto jsonBody = clinfo->json();
         std::cout << boost::json::serialize(boost::json::value_from(jsonBody)) << std::endl;
         exit(0);
     }
-    
+
     const bool shouldLogTofile = isArgOption(argv, argv + argc, "--enable-file-tracing");
     char* filename = getArgOption(argv, argv + argc, "--filename");
     char* levelStr = getArgOption(argv, argv + argc, "--level");
@@ -62,7 +62,7 @@ int main(int argc, char* argv[])
         GLogger::instance().SetMinLevel(GLogger::Output::File, level);
     }
 
-    
+
 #if defined(WIN32)
     // to handle CRLF
     if (_setmode(_fileno(stdin), _O_BINARY) == -1)

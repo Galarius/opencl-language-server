@@ -21,9 +21,9 @@ namespace vscode::opencl {
 struct ICLInfo
 {
     virtual ~ICLInfo() = default;
-    
+
     virtual boost::json::object json() = 0;
-    
+
     virtual uint32_t GetDeviceID(const cl::Device& device) = 0;
 
     virtual std::string GetDeviceDescription(const cl::Device& device) = 0;

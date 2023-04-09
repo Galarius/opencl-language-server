@@ -369,12 +369,8 @@ uint32_t CalculateDeviceID(const cl::Device& device)
         auto vendor = device.getInfo<CL_DEVICE_VENDOR>();
         auto vendorID = device.getInfo<CL_DEVICE_VENDOR_ID>();
         auto driverVersion = device.getInfo<CL_DRIVER_VERSION>();
-        auto identifier = std::move(name)
-                        + std::to_string(type)
-                        + std::move(version)
-                        + std::move(vendor)
-                        + std::to_string(vendorID)
-                        + std::move(driverVersion);
+        auto identifier = std::move(name) + std::to_string(type) + std::move(version) + std::move(vendor) +
+            std::to_string(vendorID) + std::move(driverVersion);
         return CRC32(identifier.begin(), identifier.end());
     }
     catch (const cl::Error& err)
@@ -482,7 +478,7 @@ public:
 
         return json::object {{"PLATFORMS", jsonPlatforms}};
     }
-        
+
     uint32_t GetDeviceID(const cl::Device& device)
     {
         return CalculateDeviceID(device);
@@ -500,12 +496,9 @@ public:
         RemoveNullTerminator(version);
         RemoveNullTerminator(vendor);
         RemoveNullTerminator(driverVersion);
-        auto description = "name: " + std::move(name) + "; "
-                         + "type: " + std::to_string(type) + "; "
-                         + "version: " + std::move(version) + "; "
-                         + "vendor: " + std::move(vendor) + "; "
-                         + "vendorID: " + std::to_string(vendorID) + "; "
-                         + "driverVersion: " + std::move(driverVersion);
+        auto description = "name: " + std::move(name) + "; " + "type: " + std::to_string(type) + "; " +
+            "version: " + std::move(version) + "; " + "vendor: " + std::move(vendor) + "; " +
+            "vendorID: " + std::to_string(vendorID) + "; " + "driverVersion: " + std::move(driverVersion);
         return description;
     }
 };
