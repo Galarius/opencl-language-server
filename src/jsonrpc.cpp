@@ -13,9 +13,9 @@ using namespace boost;
 namespace vscode::opencl {
 
 namespace {
-    constexpr char TracePrefix[] = "#jrpc ";
-    constexpr char LE[] = "\r\n";
-}
+constexpr char TracePrefix[] = "#jrpc ";
+constexpr char LE[] = "\r\n";
+} // namespace
 
 void JsonRPC::RegisterMethodCallback(const std::string& method, InputCallbackFunc&& func)
 {

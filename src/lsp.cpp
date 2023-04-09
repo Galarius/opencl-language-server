@@ -253,7 +253,7 @@ void LSPServer::OnConfiguration(const json::object& data)
 
         auto maxProblemsCount = result.at(1).as_int64();
         m_diagnostics->SetMaxProblemsCount(static_cast<int>(maxProblemsCount));
-        
+
         auto deviceID = result.at(2).as_int64();
         m_diagnostics->SetOpenCLDevice(static_cast<uint32_t>(deviceID));
     }
