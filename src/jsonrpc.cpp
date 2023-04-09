@@ -183,7 +183,7 @@ void JsonRPC::OnInitialize()
         m_initialized = true;
         GLogDebug(
             TracePrefix,
-            "Tracing options: is verbose",
+            "Tracing options: is verbose: ",
             m_verbosity ? "yes" : "no",
             ", is on: ",
             m_tracing ? "yes" : "no");
