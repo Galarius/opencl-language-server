@@ -79,7 +79,10 @@ target_include_directories(${TESTS_PROJECT_NAME}
      PRIVATE ${PROJECT_SOURCE_DIR}/lib/json/include
      PRIVATE ${PROJECT_SOURCE_DIR}/lib/logger/include
      PRIVATE ${PROJECT_SOURCE_DIR}/lib/catch/single_include
+     PRIVATE ${PROJECT_SOURCE_DIR}/lib/opencl/include
 )
+
+target_link_libraries (${TESTS_PROJECT_NAME} ${LIBS})
 
 target_compile_definitions(${TESTS_PROJECT_NAME} PRIVATE 
     CATCH_CONFIG_MAIN
