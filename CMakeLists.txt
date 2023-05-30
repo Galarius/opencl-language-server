@@ -32,6 +32,7 @@ message(STATUS "C++ Flags:" ${CMAKE_CXX_FLAGS})
 message(STATUS "List of compile features:" ${CMAKE_CXX_COMPILE_FEATURES})
 message(STATUS "Toolchain file:" ${CMAKE_TOOLCHAIN_FILE})
 
+find_package(spdlog REQUIRED)
 find_package(nlohmann_json REQUIRED)
 find_package(OpenCL REQUIRED)
 message(STATUS "OpenCL found: ${OpenCL_FOUND}")
@@ -64,7 +65,7 @@ list(TRANSFORM headers PREPEND "${CMAKE_CURRENT_SOURCE_DIR}/include/")
 list(TRANSFORM sources PREPEND "${CMAKE_CURRENT_SOURCE_DIR}/src/")
 source_group("include" FILES ${headers})
 source_group("src" FILES ${sources})
-set(libs ${OpenCL_LIBRARIES} nlohmann_json::nlohmann_json)
+set(libs ${OpenCL_LIBRARIES} nlohmann_json::nlohmann_json spdlog::spdlog)
 if(LINUX)
     set(libs ${libs} stdc++fs)
 endif()
@@ -78,8 +79,6 @@ target_link_libraries(${PROJECT_NAME} ${libs})
 target_include_directories(${PROJECT_NAME} PRIVATE 
     "${OpenCL_INCLUDE_DIRS}"
     "${PROJECT_SOURCE_DIR}/include"
-    "${PROJECT_SOURCE_DIR}/lib/logger/include"
     "${PROJECT_SOURCE_DIR}/lib/opencl/include"
-    "${PROJECT_SOURCE_DIR}/lib/json/include"
     "${PROJECT_SOURCE_DIR}/lib/filesystem/include"
 )

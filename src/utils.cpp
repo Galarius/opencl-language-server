@@ -6,13 +6,13 @@
 //
 
 #include "utils.hpp"
-#include <glogger.hpp>
 
 #include <algorithm>
 #include <functional>
-#include <sstream>
 #include <random>
 #include <regex>
+#include <spdlog/spdlog.h>
+#include <sstream>
 
 namespace vscode::opencl::utils {
 
@@ -84,7 +84,7 @@ std::string UriToPath(const std::string& uri)
     }
     catch (std::exception& e)
     {
-        GLogError("Failed to convert file uri to path: ", e.what());
+        spdlog::error("Failed to convert file uri to path, {}", e.what());
     }
     return uri;
 }

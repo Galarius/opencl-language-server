@@ -9,20 +9,19 @@
 #include "opencl.hpp"
 #include "utils.hpp"
 
+#include <filesystem.hpp>
 #include <iostream>
 #include <optional>
 #include <regex>
+#include <spdlog/spdlog.h>
 #include <stdexcept> // std::runtime_error, std::invalid_argument
 #include <tuple>
-
-#include <filesystem.hpp>
-#include <glogger.hpp>
 
 using namespace nlohmann;
 
 namespace {
 
-constexpr char TracePrefix[] = "#diagnostics ";
+constexpr char logger[] = "diagnostics";
 
 int ParseSeverity(const std::string& severity)
 {
@@ -86,7 +85,7 @@ Diagnostics::Diagnostics(std::shared_ptr<ICLInfo> clInfo) : m_clInfo {std::move(
 
 void Diagnostics::SetOpenCLDevice(uint32_t identifier)
 {
-    GLogTrace(TracePrefix, "Selecting OpenCL platform...");
+    spdlog::get(logger)->trace("Selecting OpenCL platform...");
     std::vector<cl::Platform> platforms;
     try
     {
@@ -94,10 +93,10 @@ void Diagnostics::SetOpenCLDevice(uint32_t identifier)
     }
     catch (cl::Error& err)
     {
-        GLogError(TracePrefix, "No OpenCL platforms were found, ", err.what(), " (", err.err(), ")");
+        spdlog::get(logger)->error("No OpenCL platforms were found, {}", err.what());
     }
 
-    GLogInfo(TracePrefix, "Found OpenCL platforms: ", platforms.size());
+    spdlog::get(logger)->info("Found OpenCL platforms: {}", platforms.size());
     if (platforms.size() == 0)
     {
         return;
@@ -114,16 +113,16 @@ void Diagnostics::SetOpenCLDevice(uint32_t identifier)
         }
         catch (cl::Error& err)
         {
-            GLogError(TracePrefix, "No OpenCL devices were found, ", err.what(), " (", err.err(), ")");
+            spdlog::get(logger)->error("No OpenCL devices were found, {}", err.what());
         }
-        GLogInfo(TracePrefix, "Found OpenCL devices: ", devices.size());
+        spdlog::get(logger)->info("Found OpenCL devices: {}", devices.size());
         if (devices.size() == 0)
         {
             return;
         }
 
         size_t maxPowerIndex = 0;
-        GLogTrace(TracePrefix, "Selecting OpenCL device (total:", devices.size(), ")...");
+        spdlog::get(logger)->trace("Selecting OpenCL device (total: {})...", devices.size());
         for (auto& device : devices)
         {
             size_t powerIndex = 0;
@@ -143,7 +142,7 @@ void Diagnostics::SetOpenCLDevice(uint32_t identifier)
             }
             catch (cl::Error& err)
             {
-                GLogWarn(TracePrefix, "Failed to get info for a device, ", err.what(), " (", err.err(), ")");
+                spdlog::get(logger)->error("Failed to get info for a device, {}", err.what());
                 continue;
             }
 
@@ -155,7 +154,7 @@ void Diagnostics::SetOpenCLDevice(uint32_t identifier)
         }
     }
     m_device = selectedDevice;
-    GLogInfo(TracePrefix, "Selected OpenCL device: ", description);
+    spdlog::get(logger)->info("Selected OpenCL device: {}", description);
 }
 
 std::string Diagnostics::BuildSource(const std::string& source) const
@@ -170,7 +169,7 @@ std::string Diagnostics::BuildSource(const std::string& source) const
     cl::Program program;
     try
     {
-        GLogDebug(TracePrefix, "Building program with options: ", m_BuildOptions);
+        spdlog::get(logger)->debug("Building program with options: {}", m_BuildOptions);
         program = cl::Program(context, source, false);
         program.build(ds, m_BuildOptions.c_str());
     }
@@ -178,7 +177,7 @@ std::string Diagnostics::BuildSource(const std::string& source) const
     {
         if (err.err() != CL_BUILD_PROGRAM_FAILURE)
         {
-            GLogError(TracePrefix, "Failed to build program, error: ", err.what(), " (", err.err(), ")");
+            spdlog::get(logger)->error("Failed to build program, error, {}", err.what());
         }
     }
 
@@ -190,7 +189,7 @@ std::string Diagnostics::BuildSource(const std::string& source) const
     }
     catch (cl::Error& err)
     {
-        GLogError(TracePrefix, "Failed get build info, error: ", err.what(), " (", err.err(), ")");
+        spdlog::get(logger)->error("Failed get build info, error, {}", err.what());
     }
 
     return build_log;
@@ -210,7 +209,7 @@ nlohmann::json Diagnostics::BuildDiagnostics(const std::string& buildLog, const 
 
         if (count++ > m_maxNumberOfProblems)
         {
-            GLogInfo(TracePrefix, "Maximum number of problems reached, other problems will be slipped");
+            spdlog::get(logger)->info("Maximum number of problems reached, other problems will be slipped");
             break;
         }
 
@@ -244,7 +243,7 @@ nlohmann::json Diagnostics::Get(const Source& source)
         throw std::runtime_error("missing OpenCL device");
     }
 
-    GLogDebug(TracePrefix, "Getting diagnostics...");
+    spdlog::get(logger)->trace("Getting diagnostics...");
     std::string buildLog;
     std::string srcName;
 
@@ -256,7 +255,7 @@ nlohmann::json Diagnostics::Get(const Source& source)
 
     buildLog = BuildSource(source.text);
     utils::RemoveNullTerminator(buildLog);
-    GLogTrace(TracePrefix, "BuildLog:\n", buildLog);
+    spdlog::get(logger)->trace("BuildLog:\n", buildLog);
 
     return BuildDiagnostics(buildLog, srcName);
 }
@@ -272,17 +271,17 @@ void Diagnostics::SetBuildOptions(const json& options)
             args.append(" ");
         }
         m_BuildOptions = std::move(args);
-        GLogDebug(TracePrefix, "Set build options: ", m_BuildOptions);
+        spdlog::get(logger)->trace("Set build options, {}", m_BuildOptions);
     }
     catch (std::exception& e)
     {
-        GLogError(TracePrefix, "Failed to parse build options, error", e.what());
+        spdlog::get(logger)->error("Failed to parse build options, {}", e.what());
     }
 }
 
 void Diagnostics::SetMaxProblemsCount(int maxNumberOfProblems)
 {
-    GLogDebug(TracePrefix, "Set max number of problems: ", maxNumberOfProblems);
+    spdlog::get(logger)->trace("Set max number of problems: {}", maxNumberOfProblems);
     m_maxNumberOfProblems = maxNumberOfProblems;
 }
 
