@@ -7,11 +7,11 @@
 
 #include <catch2/catch_all.hpp>
 
-#include "jsonrpc.hpp"
-#define __glogger_implementation__ // define this only once
 #include "diagnostics.hpp"
-#include <glogger.hpp>
+#include "jsonrpc.hpp"
 #include <nlohmann/json.hpp>
+#include <spdlog/spdlog.h>
+#include <spdlog/sinks/null_sink.h>
 
 using namespace vscode::opencl;
 using namespace nlohmann;
@@ -54,7 +54,20 @@ std::string ParseResponse(std::string str)
 
 TEST_CASE("JSON-RPC TESTS", "<->")
 {
-    // EnableTracing();
+    SECTION("Init Logger") 
+    {
+        auto sink = std::make_shared<spdlog::sinks::null_sink_st>();
+        auto mainLogger = std::make_shared<spdlog::logger>("opencl-language-server", sink);
+        auto clinfoLogger = std::make_shared<spdlog::logger>("clinfo", sink);
+        auto diagnosticsLogger = std::make_shared<spdlog::logger>("diagnostics", sink);
+        auto jsonrpcLogger = std::make_shared<spdlog::logger>("jrpc", sink);
+        auto lspLogger = std::make_shared<spdlog::logger>("lsp", sink);
+        spdlog::set_default_logger(mainLogger);
+        spdlog::register_logger(clinfoLogger);
+        spdlog::register_logger(diagnosticsLogger);
+        spdlog::register_logger(jsonrpcLogger);
+        spdlog::register_logger(lspLogger);
+    }
 
     SECTION("Invalid request handling")
     {

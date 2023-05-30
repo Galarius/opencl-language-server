@@ -11,7 +11,7 @@
 #include "utils.hpp"
 
 #include <atomic>
-#include <glogger.hpp>
+#include <spdlog/spdlog.h>
 
 #include <queue>
 
@@ -19,7 +19,7 @@ using namespace nlohmann;
 
 namespace vscode::opencl {
 
-constexpr char TracePrefix[] = "#lsp ";
+constexpr char logger[] = "lsp";
 
 struct Capabilities
 {
@@ -63,10 +63,10 @@ void LSPServer::GetConfiguration()
 {
     if (!m_capabilities.hasConfigurationCapability)
     {
-        GLogDebug(TracePrefix, "Does not have configuration capability");
+        spdlog::get(logger)->debug("Does not have configuration capability");
         return;
     }
-    GLogDebug(TracePrefix, "Make configuration request");
+    spdlog::get(logger)->debug("Make configuration request");
     json buildOptions = {{"section", "OpenCL.server.buildOptions"}};
     json maxNumberOfProblems = {{"section", "OpenCL.server.maxNumberOfProblems"}};
     json openCLDeviceID = {{"section", "OpenCL.server.deviceID"}};
@@ -81,7 +81,7 @@ void LSPServer::GetConfiguration()
 
 void LSPServer::OnInitialize(const json &data)
 {
-    GLogDebug(TracePrefix, "Received 'initialize' request");
+    spdlog::get(logger)->debug("Received 'initialize' request");
     try
     {
         m_capabilities.hasConfigurationCapability =
@@ -101,7 +101,7 @@ void LSPServer::OnInitialize(const json &data)
     }
     catch (std::exception &err)
     {
-        GLogError(TracePrefix, "Failed to parse initialize parameters: ", err.what());
+        spdlog::get(logger)->error("Failed to parse initialize parameters, {}", err.what());
     }
 
     json capabilities = {
@@ -120,10 +120,10 @@ void LSPServer::OnInitialize(const json &data)
 
 void LSPServer::OnInitialized(const json &)
 {
-    GLogDebug(TracePrefix, "Received 'initialized' message");
+    spdlog::get(logger)->debug("Received 'initialized' message");
     if (!m_capabilities.supportDidChangeConfiguration)
     {
-        GLogDebug(TracePrefix, "Does not support didChangeConfiguration registration");
+        spdlog::get(logger)->debug("Does not support didChangeConfiguration registration");
         return;
     }
 
@@ -144,7 +144,7 @@ void LSPServer::BuildDiagnosticsRespond(const std::string &uri, const std::strin
     try
     {
         const auto filePath = utils::UriToPath(uri);
-        GLogDebug("Converted uri '", uri, "' to path '", filePath, "'");
+        spdlog::get(logger)->debug("Converted uri '{}' to path '{}'", uri, filePath);
 
         json diags = m_diagnostics->Get({filePath, content});
         m_outQueue.push(
@@ -158,14 +158,14 @@ void LSPServer::BuildDiagnosticsRespond(const std::string &uri, const std::strin
     catch (std::exception &err)
     {
         auto msg = std::string("Failed to get diagnostics: ") + err.what();
-        GLogError(TracePrefix, msg);
+        spdlog::get(logger)->error(msg);
         m_jrpc.WriteError(JsonRPC::ErrorCode::InternalError, msg);
     }
 }
 
 void LSPServer::OnTextOpen(const json &data)
 {
-    GLogDebug(TracePrefix, "Received 'textOpen' message");
+    spdlog::get(logger)->debug("Received 'textOpen' message");
     std::string srcUri = data["params"]["textDocument"]["uri"].get<std::string>();
     std::string content = data["params"]["textDocument"]["text"].get<std::string>();
     BuildDiagnosticsRespond(srcUri, content);
@@ -173,7 +173,7 @@ void LSPServer::OnTextOpen(const json &data)
 
 void LSPServer::OnTextChanged(const json &data)
 {
-    GLogDebug(TracePrefix, "Received 'textChanged' message");
+    spdlog::get(logger)->debug("Received 'textChanged' message");
     std::string srcUri = data["params"]["textDocument"]["uri"].get<std::string>();
     std::string content = data["params"]["contentChanges"][0]["text"].get<std::string>();
 
@@ -182,17 +182,17 @@ void LSPServer::OnTextChanged(const json &data)
 
 void LSPServer::OnConfiguration(const json &data)
 {
-    GLogDebug(TracePrefix, "Received 'configuration' respond");
+    spdlog::get(logger)->debug("Received 'configuration' respond");
     auto result = data["result"];
     if (result.empty())
     {
-        GLogWarn(TracePrefix, "Empty result");
+        spdlog::get(logger)->warn("Empty result");
         return;
     }
 
     if (result.size() != 3)
     {
-        GLogWarn(TracePrefix, "Unexpected result items count");
+        spdlog::get(logger)->warn("Unexpected result items count");
         return;
     }
 
@@ -209,13 +209,13 @@ void LSPServer::OnConfiguration(const json &data)
     }
     catch (std::exception &err)
     {
-        GLogError(TracePrefix, "Failed to update settings", err.what());
+        spdlog::get(logger)->error("Failed to update settings, {}", err.what());
     }
 }
 
 void LSPServer::OnRespond(const json &data)
 {
-    GLogDebug(TracePrefix, "Received client respond");
+    spdlog::get(logger)->debug("Received client respond");
     const auto id = data["id"];
     if (!m_requests.empty())
     {
@@ -228,14 +228,14 @@ void LSPServer::OnRespond(const json &data)
 
 void LSPServer::OnShutdown(const json &data)
 {
-    GLogDebug(TracePrefix, "Received 'shutdown' request");
+    spdlog::get(logger)->debug("Received 'shutdown' request");
     m_outQueue.push({{"id", data["id"]}, {"result", nullptr}});
     m_shutdown = true;
 }
 
 void LSPServer::OnExit()
 {
-    GLogDebug(TracePrefix, "Received 'exit', after 'shutdown': ", m_shutdown ? "yes" : "no");
+    spdlog::get(logger)->debug("Received 'exit', after 'shutdown': {}", m_shutdown ? "yes" : "no");
     if (m_shutdown)
         exit(EXIT_SUCCESS);
     else
@@ -244,7 +244,7 @@ void LSPServer::OnExit()
 
 int LSPServer::Run()
 {
-    GLogInfo("Setting up...");
+    spdlog::get(logger)->info("Setting up...");
     auto self = this->shared_from_this();
     // clang-format off
     // Register handlers for methods
@@ -293,7 +293,7 @@ int LSPServer::Run()
     });
     // clang-format off
     
-    GLogInfo("Listening...");
+    spdlog::get(logger)->info("Listening...");
     char c;
     while (std::cin.get(c))
     {

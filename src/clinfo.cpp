@@ -9,7 +9,7 @@
 #include "utils.hpp"
 
 #include <array>
-#include <glogger.hpp>
+#include <spdlog/spdlog.h>
 #include <unordered_map>
 
 using namespace nlohmann;
@@ -18,7 +18,7 @@ using vscode::opencl::ICLInfo;
 
 namespace {
 
-constexpr const char TracePrefix[] = "#clinfo ";
+constexpr const char logger[] = "clinfo";
 
 const std::unordered_map<cl_bool, std::string> booleanChoices {
     {CL_TRUE, "CL_TRUE"},
@@ -351,7 +351,7 @@ json::object_t GetDeviceJSONInfo(const cl::Device& device)
         }
         catch (const cl::Error& err)
         {
-            GLogWarn(TracePrefix, "Failed to get info for the device, ", err.what(), " (", err.err(), ")");
+            spdlog::get(logger)->error("Failed to get info for the device, {}", err.what());
             continue;
         }
     }
@@ -374,7 +374,7 @@ uint32_t CalculateDeviceID(const cl::Device& device)
     }
     catch (const cl::Error& err)
     {
-        GLogWarn(TracePrefix, "Failed to calculate device uuid, ", err.what(), " (", err.err(), ")");
+        spdlog::get(logger)->error("Failed to calculate device uuid, {}", err.what());
     }
     return 0;
 }
@@ -404,7 +404,7 @@ uint32_t CalculatePlatformID(const cl::Platform& platform)
     }
     catch (const cl::Error& err)
     {
-        GLogWarn(TracePrefix, "Failed to calculate device uuid, ", err.what(), " (", err.err(), ")");
+        spdlog::get(logger)->error("Failed to calculate platform uuid, {}", err.what());
     }
     return 0;
 }
@@ -423,7 +423,7 @@ json GetPlatformJSONInfo(const cl::Platform& platform)
         }
         catch (const cl::Error& err)
         {
-            GLogWarn(TracePrefix, "Failed to get info for a platform, ", err.what(), " (", err.err(), ")");
+            spdlog::get(logger)->error("Failed to get info for a platform, {}", err.what());
         }
     }
 
@@ -441,7 +441,7 @@ json GetPlatformJSONInfo(const cl::Platform& platform)
     }
     catch (const cl::Error& err)
     {
-        GLogWarn(TracePrefix, "Failed to get devices for a platform, ", err.what(), " (", err.err(), ")");
+        spdlog::get(logger)->error("Failed to get devices for a platform, {}", err.what());
     }
 
     return info;
@@ -452,7 +452,7 @@ class CLInfo final : public ICLInfo
 public:
     nlohmann::json json()
     {
-        GLogTrace(TracePrefix, "Searching for OpenCL platforms...");
+        spdlog::get(logger)->trace("Searching for OpenCL platforms...");
         std::vector<cl::Platform> platforms;
         try
         {
@@ -460,10 +460,10 @@ public:
         }
         catch (const cl::Error& err)
         {
-            GLogError(TracePrefix, "No OpenCL platforms were found, ", err.what(), " (", err.err(), ")");
+            spdlog::get(logger)->error("No OpenCL platforms were found, err.what()");
         }
 
-        GLogInfo(TracePrefix, "Found OpenCL platforms: ", platforms.size());
+        spdlog::get(logger)->info("Found OpenCL platforms, {}", platforms.size());
         if (platforms.size() == 0)
         {
             return {};
