@@ -7,19 +7,18 @@
 
 #pragma once
 
-#include <regex>
-#include <iostream>
-#include <optional>
 #include <functional>
+#include <iostream>
+#include <nlohmann/json.hpp>
+#include <optional>
+#include <regex>
 #include <unordered_map>
-
-#include "json.hpp"
 
 namespace vscode::opencl {
 
 class JsonRPC
 {
-    using InputCallbackFunc = std::function<void(const boost::json::object&)>;
+    using InputCallbackFunc = std::function<void(const nlohmann::json&)>;
     using OutputCallbackFunc = std::function<void(const std::string&)>;
 
 public:
@@ -61,7 +60,7 @@ public:
 
     void Consume(char c);
     bool IsReady() const;
-    void Write(const boost::json::object& data) const;
+    void Write(const nlohmann::json& data) const;
     void Reset();
     /**
      Send trace message to client.
@@ -71,7 +70,7 @@ public:
 
 private:
     void OnInitialize();
-    void OnTracingChanged(const boost::json::object& data);
+    void OnTracingChanged(const nlohmann::json& data);
     bool ReadHeader();
     void FireMethodCallback();
     void FireRespondCallback();
@@ -79,7 +78,7 @@ private:
 private:
     std::string m_method;
     std::string m_buffer;
-    boost::json::object m_body;
+    nlohmann::json m_body;
     std::unordered_map<std::string, std::string> m_headers;
     std::unordered_map<std::string, InputCallbackFunc> m_callbacks;
     OutputCallbackFunc m_outputCallback;

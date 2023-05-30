@@ -10,15 +10,15 @@
 #include "utils.hpp"
 
 #include <iostream>
-#include <stdexcept> // std::runtime_error, std::invalid_argument
-#include <regex>
 #include <optional>
+#include <regex>
+#include <stdexcept> // std::runtime_error, std::invalid_argument
 #include <tuple>
 
-#include <glogger.hpp>
 #include <filesystem.hpp>
+#include <glogger.hpp>
 
-using namespace boost;
+using namespace nlohmann;
 
 namespace {
 
@@ -62,13 +62,13 @@ class Diagnostics final : public IDiagnostics
 public:
     explicit Diagnostics(std::shared_ptr<ICLInfo> clInfo);
 
-    void SetBuildOptions(const boost::json::array& options);
+    void SetBuildOptions(const nlohmann::json& options);
     void SetMaxProblemsCount(int maxNumberOfProblems);
     void SetOpenCLDevice(uint32_t identifier);
-    boost::json::array Get(const Source& source);
+    nlohmann::json Get(const Source& source);
 
 private:
-    boost::json::array BuildDiagnostics(const std::string& buildLog, const std::string& name);
+    nlohmann::json BuildDiagnostics(const std::string& buildLog, const std::string& name);
     std::string BuildSource(const std::string& source) const;
 
 private:
@@ -196,11 +196,11 @@ std::string Diagnostics::BuildSource(const std::string& source) const
     return build_log;
 }
 
-boost::json::array Diagnostics::BuildDiagnostics(const std::string& buildLog, const std::string& name)
+nlohmann::json Diagnostics::BuildDiagnostics(const std::string& buildLog, const std::string& name)
 {
     std::smatch matches;
     auto errorLines = utils::SplitString(buildLog, "\n");
-    json::array diagnostics;
+    json diagnostics;
     int count = 0;
     for (auto errLine : errorLines)
     {
@@ -215,8 +215,8 @@ boost::json::array Diagnostics::BuildDiagnostics(const std::string& buildLog, co
         }
 
         auto [source, line, col, severity, message] = ParseOutput(matches);
-        json::object diagnostic;
-        json::object range {
+        json diagnostic;
+        json range {
             {"start",
              {
                  {"line", line},
@@ -237,7 +237,7 @@ boost::json::array Diagnostics::BuildDiagnostics(const std::string& buildLog, co
     return diagnostics;
 }
 
-boost::json::array Diagnostics::Get(const Source& source)
+nlohmann::json Diagnostics::Get(const Source& source)
 {
     if (!m_device.has_value())
     {
@@ -261,14 +261,14 @@ boost::json::array Diagnostics::Get(const Source& source)
     return BuildDiagnostics(buildLog, srcName);
 }
 
-void Diagnostics::SetBuildOptions(const json::array& options)
+void Diagnostics::SetBuildOptions(const json& options)
 {
     try
     {
         std::string args;
         for (auto option : options)
         {
-            args.append(option.as_string());
+            args.append(option.get<std::string>());
             args.append(" ");
         }
         m_BuildOptions = std::move(args);

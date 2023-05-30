@@ -6,7 +6,7 @@ set(sources
     "${PROJECT_SOURCE_DIR}/src/jsonrpc.cpp"
     main.cpp
 )
-set(libs ${OpenCL_LIBRARIES} Catch2::Catch2WithMain)
+set(libs ${OpenCL_LIBRARIES} Catch2::Catch2WithMain nlohmann_json::nlohmann_json)
 if(LINUX)
     set(libs ${libs} stdc++fs)
 endif()
@@ -21,6 +21,5 @@ target_include_directories(${TESTS_PROJECT_NAME} PRIVATE
 )
 target_link_libraries (${TESTS_PROJECT_NAME} ${libs})
 target_compile_definitions(${TESTS_PROJECT_NAME} PRIVATE 
-    BOOST_JSON_STANDALONE
     CL_SILENCE_DEPRECATION
 )

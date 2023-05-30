@@ -7,25 +7,21 @@
 
 #include <iostream>
 
-#include "lsp.hpp"
 #include "clinfo.hpp"
+#include "lsp.hpp"
 
 #define __glogger_implementation__ // define this only once
 #include <glogger.hpp>
-
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wimplicit-fallthrough"
-#include <boost/json/src.hpp>
-#pragma GCC diagnostic pop
+#include <nlohmann/json.hpp>
 
 #ifndef VERSION
     #error version is required
 #endif
 
 #if defined(WIN32)
-    #include <stdio.h>
     #include <fcntl.h>
     #include <io.h>
+    #include <stdio.h>
 #endif
 
 using namespace vscode::opencl;
@@ -45,7 +41,7 @@ int main(int argc, char* argv[])
     {
         auto clinfo = CreateCLInfo();
         auto jsonBody = clinfo->json();
-        std::cout << boost::json::serialize(boost::json::value_from(jsonBody)) << std::endl;
+        std::cout << jsonBody.dump() << std::endl;
         exit(0);
     }
 

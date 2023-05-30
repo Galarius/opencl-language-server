@@ -8,9 +8,9 @@
 #pragma once
 
 #include <memory>
+#include <nlohmann/json.hpp>
 #include <string>
 
-#include "json.hpp"
 #include "opencl.hpp"
 
 namespace vscode::opencl {
@@ -19,7 +19,7 @@ struct ICLInfo
 {
     virtual ~ICLInfo() = default;
 
-    virtual boost::json::object json() = 0;
+    virtual nlohmann::json json() = 0;
 
     virtual uint32_t GetDeviceID(const cl::Device& device) = 0;
 
