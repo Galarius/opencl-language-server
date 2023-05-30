@@ -12,6 +12,7 @@
 
 #define __glogger_implementation__ // define this only once
 #include <glogger.hpp>
+#include <csignal>
 #include <nlohmann/json.hpp>
 
 #ifndef VERSION
@@ -29,8 +30,17 @@ using namespace vscode::opencl;
 bool isArgOption(char** begin, char** end, const char* option);
 char* getArgOption(char** begin, char** end, const char* option);
 
+static auto server = CreateLSPServer();
+
+static void SignalHandler(int) {
+    std::cout << "Interrupt signal received. Press any key to exit." << std::endl;
+    server->Interrupt();
+}
+
 int main(int argc, char* argv[])
 {
+    std::signal(SIGINT, SignalHandler);
+    
     if (isArgOption(argv, argv + argc, "--version"))
     {
         std::cout << VERSION << std::endl;
@@ -68,10 +78,7 @@ int main(int argc, char* argv[])
         GLogError("Cannot set stdout mode to _O_BINARY");
 #endif
 
-    auto server = CreateLSPServer();
-    server->Run();
-
-    return 0;
+    return server->Run();
 }
 
 bool isArgOption(char** begin, char** end, const char* option)
