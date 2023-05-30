@@ -352,8 +352,8 @@ private:
         , m_skipEmptyMsgs(false)
         , m_trimMessages(false)
         , m_maxLogFileSize(2000000) // 2 Mb
-        , m_recordEnabled(false)
         , m_separator(" ")
+        , m_recordEnabled(false)
     { }
 
     void GLogger::WriteLogMessage(Level level, std::string& message)
@@ -429,7 +429,7 @@ private:
             std::string snow = CurrentTime(false);
             if (m_output == File || m_output == Both)
             {
-                if (Exists(m_logFile) && FileSize(m_logFile) > m_maxLogFileSize)
+                if (Exists(m_logFile) && FileSize(m_logFile) > static_cast<std::ifstream::pos_type>(m_maxLogFileSize))
                 {
                     std::string bname = Basename(m_logFile);
                     CopyFile(m_logFile, snow + "_" + bname);
@@ -548,7 +548,7 @@ private:
         if(onlyTime)
         {
             strftime (buffer, sizeof(buffer), "%H:%M:%S", timeinfo);
-            sprintf(buffer, "%s:%03d", buffer, (int)millis);
+            snprintf(buffer, sizeof(buffer), "%s:%03d", buffer, (int)millis);
         }
         else
         {

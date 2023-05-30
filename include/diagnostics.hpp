@@ -12,9 +12,10 @@
 #include <memory>
 #include <string>
 
-#pragma warning(push, 0)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-W#warnings"
 #include <boost/json.hpp>
-#pragma warning(pop)
+#pragma GCC diagnostic pop
 
 namespace vscode::opencl {
 

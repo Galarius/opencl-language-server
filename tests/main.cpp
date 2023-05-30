@@ -5,13 +5,17 @@
 //  Created by Ilya Shoshin (Galarius) on 7/16/21.
 //
 
-#include <catch2/catch.hpp>
+#include <catch2/catch_all.hpp>
 
 #include "jsonrpc.hpp"
 #define __glogger_implementation__    // define this only once
 #include <glogger.hpp>
 #include "diagnostics.hpp"
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wimplicit-fallthrough"
 #include <boost/json/src.hpp>
+#pragma GCC diagnostic pop
 
 using namespace vscode::opencl;
 using namespace boost;
@@ -47,12 +51,6 @@ std::string ParseResponse(std::string str)
         str.erase(0, pos + delimiter.length());
     }
     return str;
-}
-
-void EnableTracing()
-{
-     GLogger::instance().SetOutputMode(GLogger::Output::Console);
-     GLogger::instance().SetMinLevel(GLogger::Output::Console, GLogger::Level::Trace);
 }
 
 }
@@ -116,7 +114,7 @@ TEST_CASE( "JSON-RPC TESTS", "<->" )
     const auto InitializeJsonRPC = [&initRequest](JsonRPC& jrpc) {
         jrpc.RegisterOutputCallback([](const std::string&) {});
         
-        jrpc.RegisterMethodCallback("initialize", [](const boost::json::object& request) {});
+        jrpc.RegisterMethodCallback("initialize", [](const boost::json::object&) {});
         Send(initRequest, jrpc);
         jrpc.Reset();
     };

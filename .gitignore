@@ -20,3 +20,13 @@ xcuserdata/
 *.xccheckout
 *.xcscmblueprint
 .DS_Store
+
+## Conan
+.conan*
+CMakeUserPresets.json
+
+## build.py
+.build*
+
+## VS Code
+.vscode

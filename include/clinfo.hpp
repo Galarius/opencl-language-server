@@ -10,10 +10,7 @@
 #include <memory>
 #include <string>
 
-#pragma warning(push, 0)
-#include <boost/json.hpp>
-#pragma warning(pop)
-
+#include "json.hpp"
 #include "opencl.hpp"
 
 namespace vscode::opencl {

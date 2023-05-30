@@ -13,9 +13,7 @@
 #include <functional>
 #include <unordered_map>
 
-#pragma warning(push, 0)
-#include <boost/json.hpp>
-#pragma warning(pop)
+#include "json.hpp"
 
 namespace vscode::opencl {
 
@@ -91,7 +89,7 @@ private:
     bool m_validHeader = false;
     bool m_tracing = false;
     bool m_verbosity = false;
-    long long m_contentLength = 0;
+    unsigned long m_contentLength = 0;
     std::regex m_headerRegex {"([\\w-]+): (.+)\\r\\n(?:([^:]+)\\r\\n)?"};
 };
 
