@@ -1,0 +1,9 @@
+# Common settings (macOS)
+
+[settings]
+compiler=apple-clang
+compiler.version=14
+compiler.libcxx=libc++
+compiler.cppstd=gnu17
+os=Macos
+os.version=10.15

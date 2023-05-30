@@ -26,7 +26,7 @@ struct Capabilities
     bool supportDidChangeConfiguration = false;
 };
 
-class LSPServer
+class LSPServer final
     : public ILSPServer
     , public std::enable_shared_from_this<LSPServer>
 {
@@ -140,7 +140,7 @@ void LSPServer::OnInitialize(const json::object& data)
     // clang-format on
 }
 
-void LSPServer::OnInitialized(const json::object& data)
+void LSPServer::OnInitialized(const json::object&)
 {
     GLogDebug(TracePrefix, "Received 'initialized' message");
     if (!m_capabilities.supportDidChangeConfiguration)
@@ -322,7 +322,7 @@ void LSPServer::Run()
     {
         self->OnTextChanged(request);
     });
-    m_jrpc.RegisterMethodCallback("workspace/didChangeConfiguration", [self](const json::object& request)
+    m_jrpc.RegisterMethodCallback("workspace/didChangeConfiguration", [self](const json::object&)
     {
         self->GetConfiguration();
     });

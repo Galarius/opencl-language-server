@@ -57,7 +57,7 @@ size_t GetDevicePowerIndex(const cl::Device& device)
 
 namespace vscode::opencl {
 
-class Diagnostics : public IDiagnostics
+class Diagnostics final : public IDiagnostics
 {
 public:
     explicit Diagnostics(std::shared_ptr<ICLInfo> clInfo);

@@ -13,9 +13,10 @@
 #define __glogger_implementation__ // define this only once
 #include <glogger.hpp>
 
-#pragma warning(push, 0)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wimplicit-fallthrough"
 #include <boost/json/src.hpp>
-#pragma warning(pop)
+#pragma GCC diagnostic pop
 
 #ifndef VERSION
     #error version is required
