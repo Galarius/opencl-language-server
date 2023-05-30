@@ -13,7 +13,8 @@ namespace vscode::opencl {
 
 struct ILSPServer
 {
-    virtual void Run() = 0;
+    virtual int Run() = 0;
+    virtual void Interrupt() = 0;
 };
 
 std::shared_ptr<ILSPServer> CreateLSPServer();

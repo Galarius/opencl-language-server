@@ -10,6 +10,7 @@
 #include "jsonrpc.hpp"
 #include "utils.hpp"
 
+#include <atomic>
 #include <glogger.hpp>
 
 #include <queue>
@@ -33,7 +34,8 @@ class LSPServer final
 public:
     LSPServer() : m_diagnostics(CreateDiagnostics(CreateCLInfo())) {}
 
-    void Run();
+    int Run();
+    void Interrupt();
 
 private:
     void BuildDiagnosticsRespond(const std::string &uri, const std::string &content);
@@ -54,6 +56,7 @@ private:
     Capabilities m_capabilities;
     std::queue<std::pair<std::string, std::string>> m_requests;
     bool m_shutdown = false;
+    std::atomic<bool> m_interrupted = {false};
 };
 
 void LSPServer::GetConfiguration()
@@ -239,7 +242,7 @@ void LSPServer::OnExit()
         exit(EXIT_FAILURE);
 }
 
-void LSPServer::Run()
+int LSPServer::Run()
 {
     GLogInfo("Setting up...");
     auto self = this->shared_from_this();
@@ -294,6 +297,9 @@ void LSPServer::Run()
     char c;
     while (std::cin.get(c))
     {
+        if(m_interrupted.load()) {
+            return EINTR;
+        }
         m_jrpc.Consume(c);
         if (m_jrpc.IsReady())
         {
@@ -306,7 +312,12 @@ void LSPServer::Run()
             }
         }
     }
-//#endif
+    return 0;
+}
+
+void LSPServer::Interrupt() 
+{
+    m_interrupted.store(true);
 }
 
 std::shared_ptr<ILSPServer> CreateLSPServer()
