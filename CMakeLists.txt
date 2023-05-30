@@ -32,6 +32,7 @@ message(STATUS "C++ Flags:" ${CMAKE_CXX_FLAGS})
 message(STATUS "List of compile features:" ${CMAKE_CXX_COMPILE_FEATURES})
 message(STATUS "Toolchain file:" ${CMAKE_TOOLCHAIN_FILE})
 
+find_package(nlohmann_json REQUIRED)
 find_package(OpenCL REQUIRED)
 message(STATUS "OpenCL found: ${OpenCL_FOUND}")
 message(STATUS "OpenCL includes: ${OpenCL_INCLUDE_DIRS}")
@@ -50,7 +51,6 @@ set(headers
     lsp.hpp
     opencl.hpp
     utils.hpp
-    json.hpp
 )
 set(sources
     clinfo.cpp
@@ -64,7 +64,7 @@ list(TRANSFORM headers PREPEND "${CMAKE_CURRENT_SOURCE_DIR}/include/")
 list(TRANSFORM sources PREPEND "${CMAKE_CURRENT_SOURCE_DIR}/src/")
 source_group("include" FILES ${headers})
 source_group("src" FILES ${sources})
-set(libs ${OpenCL_LIBRARIES})
+set(libs ${OpenCL_LIBRARIES} nlohmann_json::nlohmann_json)
 if(LINUX)
     set(libs ${libs} stdc++fs)
 endif()
@@ -72,7 +72,6 @@ endif()
 add_executable (${PROJECT_NAME} ${sources} ${headers})
 target_compile_definitions(${PROJECT_NAME} PRIVATE 
     VERSION="${PACKAGE_VERSION}"
-    BOOST_JSON_STANDALONE
     CL_SILENCE_DEPRECATION
 )
 target_link_libraries(${PROJECT_NAME} ${libs})

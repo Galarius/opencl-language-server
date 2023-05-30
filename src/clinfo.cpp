@@ -12,7 +12,7 @@
 #include <glogger.hpp>
 #include <unordered_map>
 
-using namespace boost;
+using namespace nlohmann;
 using namespace vscode::opencl::utils;
 using vscode::opencl::ICLInfo;
 
@@ -179,9 +179,9 @@ std::array<CLDeviceInfo, 72> deviceProperties {{
     {CL_DRIVER_VERSION, "CL_DRIVER_VERSION", PropertyType::String},
 }};
 
-json::array GetStringsArrayFromBitfield(cl_bitfield value, const std::unordered_map<cl_bitfield, std::string>& options)
+json GetStringsArrayFromBitfield(cl_bitfield value, const std::unordered_map<cl_bitfield, std::string>& options)
 {
-    json::array values;
+    json values;
     for (auto& [bitfield, label] : options)
     {
         if (value & bitfield)
@@ -192,38 +192,37 @@ json::array GetStringsArrayFromBitfield(cl_bitfield value, const std::unordered_
     return values;
 }
 
-json::string GetStringFromEnum(cl_bitfield value, const std::unordered_map<cl_bitfield, std::string>& options)
+std::string GetStringFromEnum(cl_bitfield value, const std::unordered_map<cl_bitfield, std::string>& options)
 {
-    json::array values;
     for (auto& [bitfield, label] : options)
     {
         if (value == bitfield)
         {
-            return {label};
+            return label;
         }
     }
     return "unknown";
 }
 
-json::array GetExtensions(const std::string& strExtensions)
+json GetExtensions(const std::string& strExtensions)
 {
     auto extensions = SplitString(strExtensions, " ");
-    return json::array(extensions.begin(), extensions.end());
+    return json(extensions);
 }
 
-json::array GetKernels(const std::string& strKernels)
+json GetKernels(const std::string& strKernels)
 {
     auto kernels = SplitString(strKernels, ";");
     if (kernels.size() == 1 && kernels.front().empty())
     {
         return {};
     }
-    return json::array(kernels.begin(), kernels.end());
+    return json(kernels);
 }
 
-json::object GetDeviceJSONInfo(const cl::Device& device)
+json::object_t GetDeviceJSONInfo(const cl::Device& device)
 {
-    json::object info;
+    json info;
     for (auto& property : deviceProperties)
     {
         try
@@ -302,7 +301,7 @@ json::object GetDeviceJSONInfo(const cl::Device& device)
                 {
                     std::vector<std::size_t> values;
                     device.getInfo(property.field, &values);
-                    info[property.name] = json::array(values.begin(), values.end());
+                    info[property.name] = json(values);
                     break;
                 }
                 case PropertyType::DeviceLocalMemType:
@@ -330,7 +329,7 @@ json::object GetDeviceJSONInfo(const cl::Device& device)
                 {
                     std::vector<cl_device_partition_property> values;
                     device.getInfo(property.field, &values);
-                    json::array partitionProperties;
+                    json partitionProperties;
                     for (auto property : values)
                     {
                         if (property != 0)
@@ -380,9 +379,9 @@ uint32_t CalculateDeviceID(const cl::Device& device)
     return 0;
 }
 
-json::array GetDevicesJSONInfo(const std::vector<cl::Device>& devices)
+json GetDevicesJSONInfo(const std::vector<cl::Device>& devices)
 {
-    json::array jsonDevices;
+    json jsonDevices;
     for (auto& device : devices)
     {
         auto info = GetDeviceJSONInfo(device);
@@ -410,9 +409,9 @@ uint32_t CalculatePlatformID(const cl::Platform& platform)
     return 0;
 }
 
-json::object GetPlatformJSONInfo(const cl::Platform& platform)
+json GetPlatformJSONInfo(const cl::Platform& platform)
 {
-    json::object info;
+    json info;
     for (auto& property : platformProperties)
     {
         try
@@ -451,7 +450,7 @@ json::object GetPlatformJSONInfo(const cl::Platform& platform)
 class CLInfo final : public ICLInfo
 {
 public:
-    json::object json()
+    nlohmann::json json()
     {
         GLogTrace(TracePrefix, "Searching for OpenCL platforms...");
         std::vector<cl::Platform> platforms;
@@ -470,13 +469,13 @@ public:
             return {};
         }
 
-        std::vector<json::object> jsonPlatforms;
+        std::vector<nlohmann::json> jsonPlatforms;
         for (auto& platform : platforms)
         {
             jsonPlatforms.emplace_back(GetPlatformJSONInfo(platform));
         }
 
-        return json::object {{"PLATFORMS", jsonPlatforms}};
+        return nlohmann::json {{"PLATFORMS", jsonPlatforms}};
     }
 
     uint32_t GetDeviceID(const cl::Device& device)

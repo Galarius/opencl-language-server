@@ -8,7 +8,7 @@
 #include "jsonrpc.hpp"
 #include <glogger.hpp>
 
-using namespace boost;
+using namespace nlohmann;
 
 namespace vscode::opencl {
 
@@ -52,11 +52,11 @@ void JsonRPC::Consume(char c)
             GLogDebug(TracePrefix, ">>>>>>>>>>>>>>>>");
             GLogDebug(TracePrefix);
 
-            m_body = json::parse(m_buffer).as_object();
+            m_body = json::parse(m_buffer);
             const auto method = m_body["method"];
             if (method.is_string())
             {
-                m_method = method.as_string();
+                m_method = method.get<std::string>();
                 if (m_method == "initialize")
                 {
                     OnInitialize();
@@ -113,16 +113,16 @@ bool JsonRPC::IsReady() const
     return !m_isProcessing;
 }
 
-void JsonRPC::Write(const json::object& data) const
+void JsonRPC::Write(const json& data) const
 {
     assert(m_outputCallback);
 
     std::string message;
     try
     {
-        json::object body = data;
+        json body = data;
         body.emplace("jsonrpc", "2.0");
-        std::string content = json::serialize(json::value_from(body));
+        std::string content = body.dump();
         message.append(std::string("Content-Length: ") + std::to_string(content.size()) + LE);
         message.append(std::string("Content-Type: application/vscode-jsonrpc;charset=utf-8") + LE);
         message.append(LE);
@@ -169,15 +169,15 @@ void JsonRPC::LogTrace(const std::string& message, const std::string& verbose)
         return;
     }
 
-    Write(json::object(
-        {{"method", "$/logTrace"}, {"params", {{"message", message}, {"verbose", m_verbosity ? verbose : ""}}}}));
+    Write(
+        json({{"method", "$/logTrace"}, {"params", {{"message", message}, {"verbose", m_verbosity ? verbose : ""}}}}));
 }
 
 void JsonRPC::OnInitialize()
 {
     try
     {
-        const auto traceValue = m_body["params"].as_object().at("trace").as_string();
+        const auto traceValue = m_body["params"]["trace"].get<std::string>();
         m_tracing = traceValue != "off";
         m_verbosity = traceValue == "verbose";
         m_initialized = true;
@@ -194,11 +194,11 @@ void JsonRPC::OnInitialize()
     }
 }
 
-void JsonRPC::OnTracingChanged(const json::object& data)
+void JsonRPC::OnTracingChanged(const json& data)
 {
     try
     {
-        const auto traceValue = data.at("params").as_object().at("value").as_string();
+        const auto traceValue = data["params"]["value"].get<std::string>();
         m_tracing = traceValue != "off";
         m_verbosity = traceValue == "verbose";
         GLogDebug(
@@ -247,8 +247,8 @@ void JsonRPC::FireMethodCallback()
     auto callback = m_callbacks.find(m_method);
     if (callback == m_callbacks.end())
     {
-        const bool isRequest = m_body["params"].as_object()["id"] != nullptr;
-        const bool mustRespond = isRequest || m_method.rfind("$/", 0) == json::string::npos;
+        const bool isRequest = m_body["params"]["id"] != nullptr;
+        const bool mustRespond = isRequest || m_method.rfind("$/", 0) == std::string::npos;
         GLogDebug(
             TracePrefix,
             "Got request: ",
@@ -277,12 +277,12 @@ void JsonRPC::FireMethodCallback()
 void JsonRPC::WriteError(JsonRPC::ErrorCode errorCode, const std::string& message) const
 {
     GLogTrace(TracePrefix, "Reporting error: ", message, " (", errorCode, ")");
-    json::object obj(
-        {{"error",
-          {
-              {"code", static_cast<int>(errorCode)},
-              {"message", message},
-          }}});
+    json obj = {
+        {"error",
+         {
+             {"code", static_cast<int>(errorCode)},
+             {"message", message},
+         }}};
     Write(obj);
 }
 

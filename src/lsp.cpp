@@ -6,15 +6,15 @@
 //
 
 #include "lsp.hpp"
-#include "utils.hpp"
-#include "jsonrpc.hpp"
 #include "diagnostics.hpp"
+#include "jsonrpc.hpp"
+#include "utils.hpp"
 
 #include <glogger.hpp>
 
 #include <queue>
 
-using namespace boost;
+using namespace nlohmann;
 
 namespace vscode::opencl {
 
@@ -36,21 +36,21 @@ public:
     void Run();
 
 private:
-    void BuildDiagnosticsRespond(const std::string& uri, const std::string& content);
+    void BuildDiagnosticsRespond(const std::string &uri, const std::string &content);
     void GetConfiguration();
-    void OnInitialize(const json::object& data);
-    void OnInitialized(const json::object& data);
-    void OnTextOpen(const json::object& data);
-    void OnTextChanged(const json::object& data);
-    void OnConfiguration(const json::object& data);
-    void OnRespond(const json::object& data);
-    void OnShutdown(const json::object& data);
+    void OnInitialize(const json &data);
+    void OnInitialized(const json &data);
+    void OnTextOpen(const json &data);
+    void OnTextChanged(const json &data);
+    void OnConfiguration(const json &data);
+    void OnRespond(const json &data);
+    void OnShutdown(const json &data);
     void OnExit();
 
 private:
     JsonRPC m_jrpc;
     std::shared_ptr<IDiagnostics> m_diagnostics;
-    std::queue<json::object> m_outQueue;
+    std::queue<json> m_outQueue;
     Capabilities m_capabilities;
     std::queue<std::pair<std::string, std::string>> m_requests;
     bool m_shutdown = false;
@@ -64,61 +64,44 @@ void LSPServer::GetConfiguration()
         return;
     }
     GLogDebug(TracePrefix, "Make configuration request");
-    json::object buildOptions({{"section", "OpenCL.server.buildOptions"}});
-    json::object maxNumberOfProblems({{"section", "OpenCL.server.maxNumberOfProblems"}});
-    json::object openCLDeviceID({{"section", "OpenCL.server.deviceID"}});
+    json buildOptions = {{"section", "OpenCL.server.buildOptions"}};
+    json maxNumberOfProblems = {{"section", "OpenCL.server.maxNumberOfProblems"}};
+    json openCLDeviceID = {{"section", "OpenCL.server.deviceID"}};
     const auto requestId = utils::GenerateId();
     m_requests.push(std::make_pair("workspace/configuration", requestId));
-    // clang-format off
-    m_outQueue.push(json::object(
-        {
-            {"id", requestId},
-            {"method", "workspace/configuration"},
-            {"params", {
-                {"items", json::array({buildOptions, maxNumberOfProblems, openCLDeviceID})}
-            }}
-        }
-    ));
-    // clang-format on
+    m_outQueue.push(
+        {{"id", requestId},
+         {"method", "workspace/configuration"},
+         {"params", {{"items", json::array({buildOptions, maxNumberOfProblems, openCLDeviceID})}}}});
 }
 
 
-void LSPServer::OnInitialize(const json::object& data)
+void LSPServer::OnInitialize(const json &data)
 {
     GLogDebug(TracePrefix, "Received 'initialize' request");
     try
     {
-        // clang-format off
-        m_capabilities.hasConfigurationCapability = data.at("params").as_object()
-                                                        .at("capabilities").as_object()
-                                                        .at("workspace").as_object()
-                                                        .at("configuration").as_bool();
-        m_capabilities.supportDidChangeConfiguration = data.at("params").as_object()
-                                                           .at("capabilities").as_object()
-                                                           .at("workspace").as_object()
-                                                           .at("didChangeConfiguration").as_object()
-                                                           .at("dynamicRegistration").as_bool();
-        auto configuration = data.at("params").as_object()
-                                .at("initializationOptions").as_object()
-                                .at("configuration").as_object();
-        // clang-format on
+        m_capabilities.hasConfigurationCapability =
+            data["params"]["capabilities"]["workspace"]["configuration"].get<bool>();
+        m_capabilities.supportDidChangeConfiguration =
+            data["params"]["capabilities"]["workspace"]["didChangeConfiguration"]["dynamicRegistration"].get<bool>();
+        auto configuration = data["params"]["initializationOptions"]["configuration"];
 
-        auto buildOptions = configuration.at("buildOptions").as_array();
+        auto buildOptions = configuration["buildOptions"];
         m_diagnostics->SetBuildOptions(buildOptions);
 
-        auto maxNumberOfProblems = configuration.at("maxNumberOfProblems").as_int64();
+        auto maxNumberOfProblems = configuration["maxNumberOfProblems"].get<int64_t>();
         m_diagnostics->SetMaxProblemsCount(static_cast<int>(maxNumberOfProblems));
 
-        auto deviceID = configuration.at("deviceID").as_int64();
+        auto deviceID = configuration["deviceID"].get<int64_t>();
         m_diagnostics->SetOpenCLDevice(static_cast<uint32_t>(deviceID));
     }
-    catch (std::exception& err)
+    catch (std::exception &err)
     {
         GLogError(TracePrefix, "Failed to parse initialize parameters: ", err.what());
     }
 
-    // clang-format off
-    json::object capabilities({
+    json capabilities = {
         {"textDocumentSync",
          {
              {"openClose", true},
@@ -127,20 +110,12 @@ void LSPServer::OnInitialize(const json::object& data)
              {"willSaveWaitUntil", false},
              {"save", false},
          }},
-    });
-    m_outQueue.push(json::object(
-        {
-            {"id", data.at("id")},
-            {"result", {
-                {"capabilities", capabilities}
-                
-            }}
-        }
-    ));
-    // clang-format on
+    };
+
+    m_outQueue.push({{"id", data["id"]}, {"result", {{"capabilities", capabilities}}}});
 }
 
-void LSPServer::OnInitialized(const json::object&)
+void LSPServer::OnInitialized(const json &)
 {
     GLogDebug(TracePrefix, "Received 'initialized' message");
     if (!m_capabilities.supportDidChangeConfiguration)
@@ -149,43 +124,35 @@ void LSPServer::OnInitialized(const json::object&)
         return;
     }
 
-    // clang-format off
-    json::array registrations({{
+    json registrations = {{
         {"id", utils::GenerateId()},
         {"method", "workspace/didChangeConfiguration"},
-    }});
-    json::object params({
+    }};
+
+    json params = {
         {"registrations", registrations},
-    });
-    m_outQueue.push(json::object(
-        {
-            {"id", utils::GenerateId()},
-            {"method", "client/registerCapability"},
-            {"params", params}
-        }
-    ));
-    // clang-format on
+    };
+
+    m_outQueue.push({{"id", utils::GenerateId()}, {"method", "client/registerCapability"}, {"params", params}});
 }
 
-void LSPServer::BuildDiagnosticsRespond(const std::string& uri, const std::string& content)
+void LSPServer::BuildDiagnosticsRespond(const std::string &uri, const std::string &content)
 {
     try
     {
-        // clang-format off
         const auto filePath = utils::UriToPath(uri);
         GLogDebug("Converted uri '", uri, "' to path '", filePath, "'");
-        
-        json::array diags = m_diagnostics->Get({filePath, content});
-        m_outQueue.push(json::object({
-            {"method", "textDocument/publishDiagnostics"},
-            {"params", {
-            {"uri", uri},
-            {"diagnostics", diags},
-            }}
-        }));
-        // clang-format on
+
+        json diags = m_diagnostics->Get({filePath, content});
+        m_outQueue.push(
+            {{"method", "textDocument/publishDiagnostics"},
+             {"params",
+              {
+                  {"uri", uri},
+                  {"diagnostics", diags},
+              }}});
     }
-    catch (std::exception& err)
+    catch (std::exception &err)
     {
         auto msg = std::string("Failed to get diagnostics: ") + err.what();
         GLogError(TracePrefix, msg);
@@ -193,47 +160,27 @@ void LSPServer::BuildDiagnosticsRespond(const std::string& uri, const std::strin
     }
 }
 
-void LSPServer::OnTextOpen(const json::object& data)
+void LSPServer::OnTextOpen(const json &data)
 {
     GLogDebug(TracePrefix, "Received 'textOpen' message");
-    // clang-format off
-    std::string srcUri {
-        data.at("params").as_object()
-            .at("textDocument").as_object()
-            .at("uri").as_string()
-    };
-    std::string content {
-        data.at("params").as_object()
-            .at("textDocument").as_object()
-            .at("text").as_string()
-    };
-    // clang-format on
+    std::string srcUri = data["params"]["textDocument"]["uri"].get<std::string>();
+    std::string content = data["params"]["textDocument"]["text"].get<std::string>();
     BuildDiagnosticsRespond(srcUri, content);
 }
 
-void LSPServer::OnTextChanged(const json::object& data)
+void LSPServer::OnTextChanged(const json &data)
 {
     GLogDebug(TracePrefix, "Received 'textChanged' message");
-    // clang-format off
-    std::string srcUri {
-        data.at("params").as_object()
-            .at("textDocument").as_object()
-            .at("uri").as_string()
-    };
-    std::string content {
-        data.at("params").as_object()
-            .at("contentChanges").as_array()
-            .at(0).as_object()
-            .at("text").as_string()
-    };
-    // clang-format on
+    std::string srcUri = data["params"]["textDocument"]["uri"].get<std::string>();
+    std::string content = data["params"]["contentChanges"][0]["text"].get<std::string>();
+
     BuildDiagnosticsRespond(srcUri, content);
 }
 
-void LSPServer::OnConfiguration(const json::object& data)
+void LSPServer::OnConfiguration(const json &data)
 {
     GLogDebug(TracePrefix, "Received 'configuration' respond");
-    auto result = data.at("result").as_array();
+    auto result = data["result"];
     if (result.empty())
     {
         GLogWarn(TracePrefix, "Empty result");
@@ -248,25 +195,25 @@ void LSPServer::OnConfiguration(const json::object& data)
 
     try
     {
-        auto buildOptions = result.at(0).as_array();
+        auto buildOptions = result[0];
         m_diagnostics->SetBuildOptions(buildOptions);
 
-        auto maxProblemsCount = result.at(1).as_int64();
+        auto maxProblemsCount = result[1].get<int64_t>();
         m_diagnostics->SetMaxProblemsCount(static_cast<int>(maxProblemsCount));
 
-        auto deviceID = result.at(2).as_int64();
+        auto deviceID = result[2].get<int64_t>();
         m_diagnostics->SetOpenCLDevice(static_cast<uint32_t>(deviceID));
     }
-    catch (std::exception& err)
+    catch (std::exception &err)
     {
         GLogError(TracePrefix, "Failed to update settings", err.what());
     }
 }
 
-void LSPServer::OnRespond(const json::object& data)
+void LSPServer::OnRespond(const json &data)
 {
     GLogDebug(TracePrefix, "Received client respond");
-    const auto id = data.at("id").as_string();
+    const auto id = data["id"];
     if (!m_requests.empty())
     {
         auto request = m_requests.front();
@@ -276,10 +223,10 @@ void LSPServer::OnRespond(const json::object& data)
     }
 }
 
-void LSPServer::OnShutdown(const json::object& data)
+void LSPServer::OnShutdown(const json &data)
 {
     GLogDebug(TracePrefix, "Received 'shutdown' request");
-    m_outQueue.push(json::object({{"id", data.at("id")}, {"result", nullptr}}));
+    m_outQueue.push({{"id", data["id"]}, {"result", nullptr}});
     m_shutdown = true;
 }
 
@@ -298,41 +245,41 @@ void LSPServer::Run()
     auto self = this->shared_from_this();
     // clang-format off
     // Register handlers for methods
-    m_jrpc.RegisterMethodCallback("initialize", [self](const json::object& request)
+    m_jrpc.RegisterMethodCallback("initialize", [self](const json &request)
     {
         self->OnInitialize(request);
     });
-    m_jrpc.RegisterMethodCallback("initialized", [self](const json::object& request)
+    m_jrpc.RegisterMethodCallback("initialized", [self](const json &request)
     {
         self->OnInitialized(request);
     });
-    m_jrpc.RegisterMethodCallback("shutdown", [self](const json::object& request)
+    m_jrpc.RegisterMethodCallback("shutdown", [self](const json &request)
     {
         self->OnShutdown(request);
     });
-    m_jrpc.RegisterMethodCallback("exit", [self](const json::object&)
+    m_jrpc.RegisterMethodCallback("exit", [self](const json &)
     {
         self->OnExit();
     });
-    m_jrpc.RegisterMethodCallback("textDocument/didOpen", [self](const json::object& request)
+    m_jrpc.RegisterMethodCallback("textDocument/didOpen", [self](const json &request)
     {
         self->OnTextOpen(request);
     });
-    m_jrpc.RegisterMethodCallback("textDocument/didChange", [self](const json::object& request)
+    m_jrpc.RegisterMethodCallback("textDocument/didChange", [self](const json &request)
     {
         self->OnTextChanged(request);
     });
-    m_jrpc.RegisterMethodCallback("workspace/didChangeConfiguration", [self](const json::object&)
+    m_jrpc.RegisterMethodCallback("workspace/didChangeConfiguration", [self](const json &)
     {
         self->GetConfiguration();
     });
     // Register handler for client responds
-    m_jrpc.RegisterInputCallback([self](const json::object& respond)
+    m_jrpc.RegisterInputCallback([self](const json &respond)
     {
         self->OnRespond(respond);
     });
     // Register handler for message delivery
-    m_jrpc.RegisterOutputCallback([](const std::string& message)
+    m_jrpc.RegisterOutputCallback([](const std::string &message)
     {
         #if defined(WIN32)
             printf_s("%s", message.c_str());
