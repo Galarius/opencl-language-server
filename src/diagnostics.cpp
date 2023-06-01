@@ -6,8 +6,9 @@
 //
 
 #include "diagnostics.hpp"
-#include "opencl.hpp"
 #include "utils.hpp"
+
+#include <CL/opencl.hpp>
 
 #include <filesystem.hpp>
 #include <iostream>
