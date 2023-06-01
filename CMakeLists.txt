@@ -85,7 +85,6 @@ target_compile_definitions(${PROJECT_NAME} PRIVATE
 target_link_libraries(${PROJECT_NAME} ${libs})
 target_include_directories(${PROJECT_NAME} PRIVATE 
     "${PROJECT_SOURCE_DIR}/include"
-    "${PROJECT_SOURCE_DIR}/lib/filesystem/include"
 )
 if(APPLE)
     target_include_directories(${PROJECT_NAME} PRIVATE "${OpenCL_INCLUDE_DIRS}")

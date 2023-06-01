@@ -1,4 +1,5 @@
 from conan import ConanFile
+from conan.tools.build import check_min_cppstd
 from conan.tools.files import load
 from conan.tools.apple import is_apple_os
 
@@ -27,3 +28,6 @@ class OpenCLLanguageServerConanfile(ConanFile):
     def requirements(self):
         if not is_apple_os(self):
             self.requires("opencl-icd-loader/2022.09.30")
+    
+    def validate(self):
+        check_min_cppstd(self, 17)
