@@ -6,16 +6,22 @@ set(sources
     "${PROJECT_SOURCE_DIR}/src/jsonrpc.cpp"
     main.cpp
 )
-set(libs ${OpenCL_LIBRARIES} Catch2::Catch2WithMain nlohmann_json::nlohmann_json spdlog::spdlog OpenCL::HeadersCpp)
+set(libs Catch2::Catch2WithMain nlohmann_json::nlohmann_json spdlog::spdlog OpenCL::HeadersCpp)
 if(LINUX)
-    set(libs ${libs} stdc++fs)
+    set(libs ${libs} stdc++fs OpenCL::OpenCL)
+elseif(APPLE)
+    set(libs ${libs} ${OpenCL_LIBRARIES})
+elseif(WIN32)
+    set(libs ${libs} OpenCL::OpenCL)
 endif()
 
 add_executable (${TESTS_PROJECT_NAME} ${headers} ${sources})
 target_include_directories(${TESTS_PROJECT_NAME} PRIVATE 
-    "${OpenCL_INCLUDE_DIRS}"
     "${PROJECT_SOURCE_DIR}/include"
 )
+if(APPLE)
+    target_include_directories(${TESTS_PROJECT_NAME} PRIVATE "${OpenCL_INCLUDE_DIRS}")
+endif()
 target_link_libraries (${TESTS_PROJECT_NAME} ${libs})
 target_compile_definitions(${TESTS_PROJECT_NAME} PRIVATE 
     CL_HPP_CL_1_2_DEFAULT_BUILD
