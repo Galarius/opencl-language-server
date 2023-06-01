@@ -32,6 +32,7 @@ message(STATUS "C++ Flags:" ${CMAKE_CXX_FLAGS})
 message(STATUS "List of compile features:" ${CMAKE_CXX_COMPILE_FEATURES})
 message(STATUS "Toolchain file:" ${CMAKE_TOOLCHAIN_FILE})
 
+find_package(OpenclHeadersCpp REQUIRED)
 find_package(spdlog REQUIRED)
 find_package(nlohmann_json REQUIRED)
 find_package(OpenCL REQUIRED)
@@ -50,7 +51,6 @@ set(headers
     diagnostics.hpp
     jsonrpc.hpp
     lsp.hpp
-    opencl.hpp
     utils.hpp
 )
 set(sources
@@ -65,7 +65,7 @@ list(TRANSFORM headers PREPEND "${CMAKE_CURRENT_SOURCE_DIR}/include/")
 list(TRANSFORM sources PREPEND "${CMAKE_CURRENT_SOURCE_DIR}/src/")
 source_group("include" FILES ${headers})
 source_group("src" FILES ${sources})
-set(libs ${OpenCL_LIBRARIES} nlohmann_json::nlohmann_json spdlog::spdlog)
+set(libs ${OpenCL_LIBRARIES} nlohmann_json::nlohmann_json spdlog::spdlog OpenCL::HeadersCpp)
 if(LINUX)
     set(libs ${libs} stdc++fs)
 endif()
@@ -73,12 +73,14 @@ endif()
 add_executable (${PROJECT_NAME} ${sources} ${headers})
 target_compile_definitions(${PROJECT_NAME} PRIVATE 
     VERSION="${PACKAGE_VERSION}"
-    CL_SILENCE_DEPRECATION
+    CL_HPP_ENABLE_EXCEPTIONS
+    CL_HPP_CL_1_2_DEFAULT_BUILD
+    CL_HPP_TARGET_OPENCL_VERSION=120
+    CL_HPP_MINIMUM_OPENCL_VERSION=120
 )
 target_link_libraries(${PROJECT_NAME} ${libs})
 target_include_directories(${PROJECT_NAME} PRIVATE 
     "${OpenCL_INCLUDE_DIRS}"
     "${PROJECT_SOURCE_DIR}/include"
-    "${PROJECT_SOURCE_DIR}/lib/opencl/include"
     "${PROJECT_SOURCE_DIR}/lib/filesystem/include"
 )

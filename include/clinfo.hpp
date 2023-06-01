@@ -7,11 +7,11 @@
 
 #pragma once
 
+#include <CL/opencl.hpp>
+
 #include <memory>
 #include <nlohmann/json.hpp>
 #include <string>
-
-#include "opencl.hpp"
 
 namespace vscode::opencl {
 
