@@ -28,8 +28,14 @@ class ConanInstallAction(Action):
             default=Defaults.default_host_profile,
             help="a Conan profile to apply to the host machine [default: %(default)s]",
         )
+        subparser.add_argument(
+            "-w",
+            "--with-tests",
+            action="store_true",
+            help="install test-related requirements",
+        )
 
     def execute(self, args):
         self.controller.install_conan_dependencies(
-            args.host_profile, args.output_folder, args.clean
+            args.host_profile, args.output_folder, args.with_tests, args.clean
         )

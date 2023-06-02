@@ -6,12 +6,13 @@ class Cmake(Wrapper):
     def __init__(self):
         super(Cmake, self).__init__("cmake")
 
-    def configure(self, configuration, build_folder, toolchain_path, verbose, env):
+    def configure(self, configuration, build_folder, toolchain_path, with_tests, verbose, env):
+        enable_testing = "ON" if with_tests else "OFF"
         cmd = [
             self.executable,
             "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
             f"-DCMAKE_TOOLCHAIN_FILE={toolchain_path}",
-            "-DENABLE_TESTING=ON",
+            f"-DENABLE_TESTING={enable_testing}",
             f"-DCMAKE_BUILD_TYPE={configuration}",
         ]
         if verbose:

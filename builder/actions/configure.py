@@ -18,8 +18,8 @@ class ConfigureAction(Action):
         subparser.add_argument(
             "-bt",
             "--build-type",
-            choices=Defaults.supported_configurations,
-            default=Defaults.default_configuration,
+            choices=Defaults.supported_build_types,
+            default=Defaults.default_build_types,
             help="build type [default: %(default)s]",
         )
         subparser.add_argument(
@@ -31,14 +31,20 @@ class ConfigureAction(Action):
         subparser.add_argument(
             "-t",
             "--toolchain-path",
-            default=Defaults.toolchain_path,
+            default=Defaults.get_toolchain_path(Defaults.output_folder, Defaults.default_build_types),
             help="toolchain file path [default: %(default)s]",
+        )
+        subparser.add_argument(
+            "-w",
+            "--with-tests",
+            action="store_true",
+            help="configure test target",
         )
         subparser.add_argument(
             "-v",
             "--verbose",
             action="store_true",
-            help="c",
+            help="enable verbose output",
         )
 
     def execute(self, args):

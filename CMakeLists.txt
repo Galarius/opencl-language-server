@@ -42,7 +42,9 @@ find_package(spdlog REQUIRED)
 find_package(nlohmann_json REQUIRED)
 
 if(ENABLE_TESTING)
-    find_package(catch2 REQUIRED)
+    include(GoogleTest)
+    enable_testing()
+    find_package(gtest REQUIRED)
     add_subdirectory(tests)
 endif()
 

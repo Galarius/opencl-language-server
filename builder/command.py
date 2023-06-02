@@ -16,24 +16,15 @@ class Command(object):
         self.parser.add_argument(
             "-v", "--verbose", action="store_true", help="enable verbose output"
         )
-        self.all_actions = [
-            "conan-install",
-            "configure",
-            "build",
-        ]
         commands = self.parser.add_subparsers(dest="command", help="available commands")
-        commands.add_parser(
-            "all",
-            help=f"run the following sequence of commands:\n{';'.join(self.all_actions)}",
-        )
-
-        build_controller = BuildController()
+        actions = [
+            ConanInstallAction("conan-install", commands, ConanInstallController()),
+            ConfigureAction("configure", commands, ConfigureController()),
+            BuildAction("build", commands, BuildController()),
+        ]
         self.actions = {
-            "conan-install": ConanInstallAction(
-                "conan-install", commands, ConanInstallController()
-            ),
-            "configure": ConfigureAction("configure", commands, ConfigureController()),
-            "build": BuildAction("build", commands, build_controller),
+            *actions,
+            AllAction("all", self.parser, commands, actions)
         }
 
     def get_arguments(self):
@@ -48,20 +39,13 @@ class Command(object):
         logging.basicConfig(
             format="builder:%(levelname)s: %(message)s", level=log_level
         )
-
         try:
             if not args.command:
-                name = Command.default_action_name
-                args = self.parser.parse_args([name])
-                action = self.actions[name]
-                action.execute(args)
-            elif args.command in self.actions.keys():
-                action = self.actions[args.command]
-                action.execute(args)
-            elif args.command == "all":
-                for name in self.all_actions:
-                    action = self.actions[name]
-                    args = self.parser.parse_args([name])
-                    action.execute(args)
+                key = Command.default_action_name
+                args = self.parser.parse_args([key])
+            else:
+                key = args.command
+            action = next(a for a in self.actions if a.name == key)
+            action.execute(args)
         except RuntimeError as err:
             sys.exit(f"RuntimeError: {err}")

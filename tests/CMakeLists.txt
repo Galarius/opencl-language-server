@@ -6,7 +6,7 @@ set(sources
     "${PROJECT_SOURCE_DIR}/src/jsonrpc.cpp"
     main.cpp
 )
-set(libs Catch2::Catch2WithMain nlohmann_json::nlohmann_json spdlog::spdlog OpenCL::HeadersCpp)
+set(libs GTest::gtest nlohmann_json::nlohmann_json spdlog::spdlog OpenCL::HeadersCpp)
 if(LINUX)
     set(libs ${libs} stdc++fs OpenCL::OpenCL)
 elseif(APPLE)
@@ -28,3 +28,4 @@ target_compile_definitions(${TESTS_PROJECT_NAME} PRIVATE
     CL_HPP_TARGET_OPENCL_VERSION=120
     CL_HPP_MINIMUM_OPENCL_VERSION=120
 )
+gtest_discover_tests(${TESTS_PROJECT_NAME})
