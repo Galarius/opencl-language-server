@@ -5,7 +5,7 @@
 //  Created by Ilya Shoshin (Galarius) on 7/16/21.
 //
 
-#include <catch2/catch_all.hpp>
+#include <gtest/gtest.h>
 
 #include "diagnostics.hpp"
 #include "jsonrpc.hpp"
@@ -50,89 +50,86 @@ std::string ParseResponse(std::string str)
     return str;
 }
 
-} // namespace
-
-TEST_CASE("JSON-RPC TESTS", "<->")
-{
-    SECTION("Init Logger") 
-    {
-        auto sink = std::make_shared<spdlog::sinks::null_sink_st>();
-        auto mainLogger = std::make_shared<spdlog::logger>("opencl-language-server", sink);
-        auto clinfoLogger = std::make_shared<spdlog::logger>("clinfo", sink);
-        auto diagnosticsLogger = std::make_shared<spdlog::logger>("diagnostics", sink);
-        auto jsonrpcLogger = std::make_shared<spdlog::logger>("jrpc", sink);
-        auto lspLogger = std::make_shared<spdlog::logger>("lsp", sink);
-        spdlog::set_default_logger(mainLogger);
-        spdlog::register_logger(clinfoLogger);
-        spdlog::register_logger(diagnosticsLogger);
-        spdlog::register_logger(jsonrpcLogger);
-        spdlog::register_logger(lspLogger);
-    }
-
-    SECTION("Invalid request handling")
-    {
-        const std::string request = R"!({"jsonrpc: 2.0", "id":0, [method]: "initialize"})!";
-        const std::string message = BuildRequest(request);
-        JsonRPC jrpc;
-        jrpc.RegisterOutputCallback([](const std::string& message) {
-            auto response = json::parse(ParseResponse(message));
-            const auto code = response["error"]["code"].get<int64_t>();
-            REQUIRE(code == static_cast<int64_t>(JsonRPC::ErrorCode::ParseError));
-        });
-        Send(message, jrpc);
-    }
-
-    SECTION("Out of order request")
-    {
-        const std::string message = BuildRequest(
-            json::object({{"jsonrpc", "2.0"}, {"id", 0}, {"method", "textDocument/didOpen"}, {"params", {}}}));
-
-        JsonRPC jrpc;
-        jrpc.RegisterOutputCallback([](const std::string& message) {
-            auto response = json::parse(ParseResponse(message));
-            const auto code = response["error"]["code"].get<int64_t>();
-            REQUIRE(code == static_cast<int64_t>(JsonRPC::ErrorCode::NotInitialized));
-        });
-        Send(message, jrpc);
-    }
-
-    const std::string initRequest = BuildRequest(json::object(
+const std::string initRequest = BuildRequest(json::object(
         {{"jsonrpc", "2.0"},
          {"id", 0},
          {"method", "initialize"},
          {"params", {{"processId", 60650}, {"trace", "off"}}}}));
 
-    SECTION("Method/initialize")
-    {
-        JsonRPC jrpc;
-        jrpc.RegisterOutputCallback([](const std::string&) {});
-        jrpc.RegisterMethodCallback("initialize", [](const json& request) {
-            const auto& processId = request["params"]["processId"].get<int64_t>();
-            REQUIRE(processId == 60650);
-        });
-        Send(initRequest, jrpc);
-    }
+const auto InitializeJsonRPC = [](JsonRPC& jrpc) {
+    jrpc.RegisterOutputCallback([](const std::string&) {});
+    jrpc.RegisterMethodCallback("initialize", [](const json&) {});
+    Send(initRequest, jrpc);
+    jrpc.Reset();
+};
 
-    const auto InitializeJsonRPC = [&initRequest](JsonRPC& jrpc) {
-        jrpc.RegisterOutputCallback([](const std::string&) {});
+} // namespace
 
-        jrpc.RegisterMethodCallback("initialize", [](const json&) {});
-        Send(initRequest, jrpc);
-        jrpc.Reset();
-    };
+TEST(JsonRPCTest, InvalidRequestHandling)
+{
+    const std::string request = R"!({"jsonrpc: 2.0", "id":0, [method]: "initialize"})!";
+    const std::string message = BuildRequest(request);
+    JsonRPC jrpc;
+    jrpc.RegisterOutputCallback([](const std::string& message) {
+        auto response = json::parse(ParseResponse(message));
+        const auto code = response["error"]["code"].get<int64_t>();
+        EXPECT_EQ(code, static_cast<int64_t>(JsonRPC::ErrorCode::ParseError));
+    });
+    Send(message, jrpc);
+}
 
-    SECTION("Respond to unsupported method")
-    {
-        JsonRPC jrpc;
-        InitializeJsonRPC(jrpc);
-        // send unsupported request
-        const std::string request = BuildRequest(
-            json::object({{"jsonrpc", "2.0"}, {"id", 0}, {"method", "textDocument/didOpen"}, {"params", {}}}));
-        jrpc.RegisterOutputCallback([](const std::string& message) {
-            auto response = json::parse(ParseResponse(message));
-            const auto code = response["error"]["code"].get<int64_t>();
-            REQUIRE(code == static_cast<int64_t>(JsonRPC::ErrorCode::MethodNotFound));
-        });
-        Send(request, jrpc);
-    }
+TEST(JsonRPCTest, OutOfOrderRequest)
+{
+    const std::string message = BuildRequest(
+        json::object({{"jsonrpc", "2.0"}, {"id", 0}, {"method", "textDocument/didOpen"}, {"params", {}}}));
+
+    JsonRPC jrpc;
+    jrpc.RegisterOutputCallback([](const std::string& message) {
+        auto response = json::parse(ParseResponse(message));
+        const auto code = response["error"]["code"].get<int64_t>();
+        EXPECT_EQ(code, static_cast<int64_t>(JsonRPC::ErrorCode::NotInitialized));
+    });
+    Send(message, jrpc);
+}
+
+TEST(JsonRPCTest, MethodInitialize)
+{
+    JsonRPC jrpc;
+    jrpc.RegisterOutputCallback([](const std::string&) {});
+    jrpc.RegisterMethodCallback("initialize", [](const json& request) {
+        const auto& processId = request["params"]["processId"].get<int64_t>();
+        EXPECT_EQ(processId, 60650);
+    });
+    Send(initRequest, jrpc);
+}
+
+TEST(JsonRPCTest, RespondToUnsupportedMethod)
+{
+    JsonRPC jrpc;
+    InitializeJsonRPC(jrpc);
+    // send unsupported request
+    const std::string request = BuildRequest(
+        json::object({{"jsonrpc", "2.0"}, {"id", 0}, {"method", "textDocument/didOpen"}, {"params", {}}}));
+    jrpc.RegisterOutputCallback([](const std::string& message) {
+        auto response = json::parse(ParseResponse(message));
+        const auto code = response["error"]["code"].get<int64_t>();
+        EXPECT_EQ(code, static_cast<int64_t>(JsonRPC::ErrorCode::MethodNotFound));
+    });
+    Send(request, jrpc);
+}
+
+int main(int argc, char **argv) {
+    ::testing::InitGoogleTest(&argc, argv);
+    auto sink = std::make_shared<spdlog::sinks::null_sink_st>();
+    auto mainLogger = std::make_shared<spdlog::logger>("opencl-language-server", sink);
+    auto clinfoLogger = std::make_shared<spdlog::logger>("clinfo", sink);
+    auto diagnosticsLogger = std::make_shared<spdlog::logger>("diagnostics", sink);
+    auto jsonrpcLogger = std::make_shared<spdlog::logger>("jrpc", sink);
+    auto lspLogger = std::make_shared<spdlog::logger>("lsp", sink);
+    spdlog::set_default_logger(mainLogger);
+    spdlog::register_logger(clinfoLogger);
+    spdlog::register_logger(diagnosticsLogger);
+    spdlog::register_logger(jsonrpcLogger);
+    spdlog::register_logger(lspLogger);
+    return RUN_ALL_TESTS();
 }

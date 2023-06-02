@@ -10,6 +10,7 @@ class ConfigureController(object):
         "build_folder",
         "compiler_flags",
         "toolchain_path",
+        "with_tests",
         "verbose",
     ]
 
@@ -23,5 +24,5 @@ class ConfigureController(object):
         env["CFLAGS"] = flags
         env["CXXFLAGS"] = flags
         cmake.configure(
-            self.build_type, self.build_folder, self.toolchain_path, self.verbose, env
+            self.build_type, self.build_folder, self.toolchain_path, self.with_tests, self.verbose, env
         )

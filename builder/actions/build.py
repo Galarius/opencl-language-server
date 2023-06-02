@@ -12,8 +12,8 @@ class BuildAction(Action):
         subparser.add_argument(
             "-bt",
             "--build-type",
-            choices=Defaults.supported_configurations,
-            default=Defaults.default_configuration,
+            choices=Defaults.supported_build_types,
+            default=Defaults.default_build_types,
             help="build type [default: %(default)s]",
         )
         subparser.add_argument(
