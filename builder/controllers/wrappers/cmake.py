@@ -1,12 +1,15 @@
 from .execute import exec
 from .wrapper import Wrapper
+import os
 
 
 class Cmake(Wrapper):
     def __init__(self):
         super(Cmake, self).__init__("cmake")
 
-    def configure(self, configuration, build_folder, toolchain_path, with_tests, verbose, env):
+    def configure(
+        self, configuration, build_folder, toolchain_path, with_tests, verbose, env=None
+    ):
         enable_testing = "ON" if with_tests else "OFF"
         cmd = [
             self.executable,
@@ -18,6 +21,8 @@ class Cmake(Wrapper):
         if verbose:
             cmd.extend(["--log-level=TRACE", "-Wdev"])
         cmd.extend(["-S", ".", "-B", build_folder])
+        if not env:
+            env = os.environ.copy()
         exec(cmd, env=env, check=True)
 
     def build(self, build_folder, verbose):

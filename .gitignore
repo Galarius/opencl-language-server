@@ -24,6 +24,8 @@ xcuserdata/
 ## Conan
 .conan*
 CMakeUserPresets.json
+test_package/*
+!test_package/conanfile.py
 
 ## build.py
 .build*
@@ -31,3 +33,7 @@ CMakeUserPresets.json
 ## VS Code
 .vscode
 CMakePresets.json
+
+
+## Python
+.pyenv

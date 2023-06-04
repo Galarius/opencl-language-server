@@ -49,7 +49,7 @@ void ConfigureLogging(bool fileLogging, char *filename, char *levelStr)
         spdlog::sink_ptr sink;
         if (fileLogging)
         {   
-            auto file = std::string(filename ?: "opencl-language-server.log");
+            auto file = std::string(filename ? filename : "opencl-language-server.log");
             sink = std::make_shared<spdlog::sinks::basic_file_sink_st>(file);
         }
         else 

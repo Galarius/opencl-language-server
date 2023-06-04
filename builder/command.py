@@ -21,10 +21,11 @@ class Command(object):
             ConanInstallAction("conan-install", commands, ConanInstallController()),
             ConfigureAction("configure", commands, ConfigureController()),
             BuildAction("build", commands, BuildController()),
+            ConanCreateAction("conan-create", commands, ConanCreateController()),
         ]
         self.actions = {
             *actions,
-            AllAction("all", self.parser, commands, actions)
+            AllAction("all", self.parser, commands, actions),
         }
 
     def get_arguments(self):

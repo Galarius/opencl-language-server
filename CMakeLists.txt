@@ -25,6 +25,12 @@ option(ENABLE_TESTING "Include unittest related targtes"
     ${ENABLE_TESTING_DEFAULT}
 )
 
+if(MSVC)
+    add_compile_options(/WX /W4 /EHsc)
+else()
+    add_compile_options(-Wall -Wextra -Wpedantic -Wimplicit-fallthrough -Werror)
+endif()
+
 message(STATUS "Build Configuration")
 message(STATUS "Enable testing:" ${ENABLE_TESTING})
 message(STATUS "CMake Generator:" ${CMAKE_GENERATOR})
