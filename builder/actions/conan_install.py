@@ -7,7 +7,7 @@ class ConanInstallAction(Action):
         super(ConanInstallAction, self).__init__(name, controller)
         subparser = parser.add_parser(
             name,
-            help="install the requirements specified in a recipe (conanfile.txt)",
+            help="install the requirements specified in a recipe (conanfile.py)",
         )
         subparser.add_argument(
             "-o",
@@ -22,11 +22,18 @@ class ConanInstallAction(Action):
             help="perform fresh installation",
         )
         subparser.add_argument(
-            "-p",
+            "-pr:h",
             "--host-profile",
             type=str,
             default=Defaults.default_host_profile,
             help="a Conan profile to apply to the host machine [default: %(default)s]",
+        )
+        subparser.add_argument(
+            "-pr:b",
+            "--build-profile",
+            type=str,
+            default=Defaults.default_build_profile,
+            help="a Conan profile to apply to the build machine [default: %(default)s]",
         )
         subparser.add_argument(
             "-w",
@@ -37,5 +44,9 @@ class ConanInstallAction(Action):
 
     def execute(self, args):
         self.controller.install_conan_dependencies(
-            args.host_profile, args.output_folder, args.with_tests, args.clean
+            args.host_profile,
+            args.build_profile,
+            args.output_folder,
+            args.with_tests,
+            args.clean,
         )

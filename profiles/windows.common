@@ -4,5 +4,4 @@
 compiler=Visual Studio
 compiler.version=17
 compiler.cppstd=17
-compiler.runtime=MTd
 os=Windows

@@ -31,7 +31,9 @@ class ConfigureAction(Action):
         subparser.add_argument(
             "-t",
             "--toolchain-path",
-            default=Defaults.get_toolchain_path(Defaults.output_folder, Defaults.default_build_types),
+            default=Defaults.get_toolchain_path(
+                Defaults.output_folder, Defaults.default_build_types
+            ),
             help="toolchain file path [default: %(default)s]",
         )
         subparser.add_argument(
@@ -49,5 +51,4 @@ class ConfigureAction(Action):
 
     def execute(self, args):
         kwargs = vars(args)
-        kwargs["compiler_flags"] = Defaults.compiler_flags
         self.controller.build(**kwargs)

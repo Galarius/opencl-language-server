@@ -10,7 +10,7 @@ class AllAction(Action):
         self.root_parser = root_parser
         subparser = parser.add_parser(
             name,
-            help="run all commands",
+            help=f"run commands: { list(map(lambda a:a.name, actions)) }",
         )
         subparser.add_argument(
             "-c",
