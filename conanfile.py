@@ -20,6 +20,7 @@ class OpenCLLanguageServerConanfile(ConanFile):
     options = {"fPIC": [True, False], "enable_testing": [True, False]}
     default_options = {"fPIC": True, "enable_testing": False}
     requires = (
+        "cli11/[^2.3.2]",
         "nlohmann_json/[^3.11.2]",
         "opencl-clhpp-headers/2022.09.30",
         "spdlog/[^1.11.0]",
