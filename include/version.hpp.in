@@ -1,0 +1,7 @@
+#pragma once
+
+namespace vscode::opencl {
+
+const char version[] = "${PROJECT_VERSION}";
+
+}
