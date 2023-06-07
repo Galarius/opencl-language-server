@@ -4,7 +4,7 @@ import platform
 
 
 def map_uname_arch_to_conan_arch(arch):
-    map = {"arm64": "armv8"}
+    map = {"arm64": "armv8", "amd64": "x86_64"}
     return map[arch] if arch in map.keys() else arch
 
 
@@ -22,15 +22,26 @@ class Defaults(object):
     default_host_profile = (
         f"profiles/{system}.{default_build_types.lower()}.{current_architecture}"
     )
+    default_package_host_profile = (
+        f"profiles/{system}.{release_build_type.lower()}.{current_architecture}"
+    )
     default_build_profile = f"profiles/{system}.default"
 
     @staticmethod
     def get_toolchain_path(output_folder, build_type):
-        path = (
-            Path(output_folder)
-            / "build"
-            / build_type
-            / "generators"
-            / "conan_toolchain.cmake"
-        )
+        if Defaults.system == "windows":
+            path = (
+                Path(output_folder)
+                / "build"
+                / "generators"
+                / "conan_toolchain.cmake"
+            )
+        else:
+            path = (
+                Path(output_folder)
+                / "build"
+                / build_type
+                / "generators"
+                / "conan_toolchain.cmake"
+            )
         return str(path)

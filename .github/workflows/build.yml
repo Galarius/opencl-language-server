@@ -1,0 +1,70 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build:
+
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      matrix:
+        os: [macos-latest, ubuntu-20.04, windows-latest]
+        python-version: [3.9]
+    
+    env:
+      CONAN_HOME: ${{ github.workspace }}/.conan-home
+
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Install prerequisites (Linux)
+      if: runner.os == 'Linux'
+      run: |
+         sudo apt update
+         sudo apt install gcc-11 g++-11
+
+    - name: Create virtual environment
+      run: python3 -m venv .pyenv
+
+    - name: Activate virtual environment (Windows)
+      if: runner.os == 'Windows'
+      run: .pyenv\Scripts\activate.bat
+
+    - name: Activate virtual environment (Unix)
+      if: runner.os != 'Windows'
+      run: source .pyenv/bin/activate
+
+    - name: Setup environment
+      run: |
+        pip3 install wheel
+        pip3 install -r requirements.txt
+        conan profile detect
+
+    - name: Conan Install
+      run: |
+        python3 build.py conan-install --with-tests
+    
+    - name: Configure
+      run: |
+        python3 build.py configure --with-tests
+
+    - name: Build
+      run: |
+        python3 build.py build
+
+    - name: Test
+      run: |
+        cd .build
+        ctest --verbose --output-on-failure
+
+    - name: Conan Create
+      run: |
+        python3 build.py conan-create

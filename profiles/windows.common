@@ -1,7 +1,8 @@
 # Common settings (Windows)
 
 [settings]
-compiler=Visual Studio
-compiler.version=17
+compiler=msvc
 compiler.cppstd=17
+compiler.runtime=static
+compiler.version=193
 os=Windows

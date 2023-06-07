@@ -1,11 +1,8 @@
 # Common settings (Linux)
 
 [settings]
-arch=x86_64
-arch_target=x86_64
 compiler=gcc
 compiler.version=11
 compiler.libcxx=libstdc++11
 compiler.cppstd = gnu17
 os=Linux
-os_target=Linux

@@ -330,11 +330,11 @@ json::object_t GetDeviceJSONInfo(const cl::Device& device)
                     std::vector<cl_device_partition_property> values;
                     device.getInfo(property.field, &values);
                     json partitionProperties;
-                    for (auto property : values)
+                    for (auto value : values)
                     {
-                        if (property != 0)
+                        if (value != 0)
                         {
-                            partitionProperties.emplace_back(devicePartitionPropertyChoices.at(property));
+                            partitionProperties.emplace_back(devicePartitionPropertyChoices.at(value));
                         }
                     }
                     info[property.name] = partitionProperties;
@@ -460,7 +460,7 @@ public:
         }
         catch (const cl::Error& err)
         {
-            spdlog::get(logger)->error("No OpenCL platforms were found, err.what()");
+            spdlog::get(logger)->error("No OpenCL platforms were found ({})", err.what());
         }
 
         spdlog::get(logger)->info("Found OpenCL platforms, {}", platforms.size());
