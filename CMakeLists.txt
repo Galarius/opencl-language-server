@@ -43,15 +43,15 @@ if(APPLE)
 else()
     find_package(OpenCLICDLoader REQUIRED)
 endif()
-find_package(OpenclHeadersCpp REQUIRED)
+find_package(OpenCLHeadersCpp REQUIRED)
 find_package(spdlog REQUIRED)
 find_package(nlohmann_json REQUIRED)
-find_package(cli11 REQUIRED)
+find_package(CLI11 REQUIRED)
 
 if(ENABLE_TESTING)
+    find_package(GTest REQUIRED)
     include(GoogleTest)
     enable_testing()
-    find_package(gtest REQUIRED)
     add_subdirectory(tests)
 endif()
 
@@ -89,9 +89,20 @@ target_compile_definitions(${PROJECT_NAME} PRIVATE
     OPENCL_LS_VERSION="${PACKAGE_VERSION}"
     CL_HPP_ENABLE_EXCEPTIONS
     CL_HPP_CL_1_2_DEFAULT_BUILD
-    CL_HPP_TARGET_OPENCL_VERSION=120
-    CL_HPP_MINIMUM_OPENCL_VERSION=120
 )
+if(APPLE)
+target_compile_definitions(${PROJECT_NAME} PRIVATE 
+    CL_HPP_MINIMUM_OPENCL_VERSION=120
+    CL_HPP_TARGET_OPENCL_VERSION=120
+)
+else()
+target_compile_definitions(${PROJECT_NAME} PRIVATE 
+    CL_HPP_MINIMUM_OPENCL_VERSION=110
+    CL_HPP_TARGET_OPENCL_VERSION=300
+)
+endif()
+
+
 target_link_libraries(${PROJECT_NAME} ${libs})
 target_include_directories(${PROJECT_NAME} PRIVATE 
     "${PROJECT_SOURCE_DIR}/include"

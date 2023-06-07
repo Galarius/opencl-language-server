@@ -13,7 +13,7 @@ class ConanCreateAction(Action):
             "-pr:h",
             "--host-profile",
             type=str,
-            default=Defaults.default_host_profile,
+            default=Defaults.default_package_host_profile,
             help="a Conan profile to apply to the host machine [default: %(default)s]",
         )
         subparser.add_argument(

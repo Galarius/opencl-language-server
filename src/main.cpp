@@ -75,10 +75,12 @@ inline void SetupBinaryStreamMode()
 {
 #if defined(WIN32)
     // to handle CRLF
-    if (_setmode(_fileno(stdin), _O_BINARY) == -1)
-        GLogError("Cannot set stdin mode to _O_BINARY");
-    if (_setmode(_fileno(stdout), _O_BINARY) == -1)
-        GLogError("Cannot set stdout mode to _O_BINARY");
+    if (_setmode(_fileno(stdin), _O_BINARY) == -1) {
+        spdlog::error("Cannot set stdin mode to _O_BINARY");
+    }
+    if (_setmode(_fileno(stdout), _O_BINARY) == -1) {
+        spdlog::error("Cannot set stdout mode to _O_BINARY");
+    }
 #endif
 }
 
