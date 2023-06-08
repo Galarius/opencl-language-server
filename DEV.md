@@ -23,6 +23,10 @@ conan profile detect
 
 *Run `./build.py [cmd] --help` to learn more about configurable arguments.*
 
+## Command Line Arguments
+
+Execute the `opencl-language-server --help` command for detailed information.
+
 ## macOS
 
 ### Build a fat binary (x86_64 + armv8)
