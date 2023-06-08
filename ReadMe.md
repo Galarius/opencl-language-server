@@ -40,14 +40,6 @@ You can configure diagnostics with `json-rpc` request during the intitialization
 
 To enable file logging, pass the following parameters:
 
-### File Logging
-
-```
-./opencl-language-server --enable-file-tracing --filename <path to the log file> --level <level [0-4]>
-```
-
-*Level: `0 - Trace, 1 - Debug, 2 - Info, 3 - Warn, 4 - Error`*
-
 ## Development
 
 See [development notes](DEV.md).
