@@ -32,11 +32,11 @@ Execute the `opencl-language-server --help` command for detailed information.
 ### Build a fat binary (x86_64 + armv8)
 
 ```shell
- ./build.py conan-install -o .conan-x86_64 -pr:h profiles/darwin.release.x86_64 -pr:b profiles/darwin.default
+ ./build.py conan-install -o .conan-x86_64 -pr:h profiles/darwin.release.x86_64
  ./build.py configure -t .conan-x86_64/build/Release/generators/conan_toolchain.cmake -b .build-x86_64 -bt Release
  ./build.py build -b .build-x86_64 -bt Release 
 
- ./build.py conan-install -o .conan-armv8 -pr:h profiles/darwin.release.armv8 -pr:b profiles/darwin.default
+ ./build.py conan-install -o .conan-armv8 -pr:h profiles/darwin.release.armv8
  ./build.py configure -t .conan-armv8/build/Release/generators/conan_toolchain.cmake -b .build-armv8 -bt Release
  ./build.py build -b .build-armv8 -bt Release 
 
