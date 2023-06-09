@@ -6,6 +6,7 @@ from pathlib import Path
 class BuildController(object):
     __acceptable_keys = [
         "build_folder",
+        "build_type",
         "verbose",
     ]
 
@@ -14,4 +15,4 @@ class BuildController(object):
         validate_folder(Path(self.build_folder), False)
         cmake = Cmake()
         cmake.check_availability()
-        cmake.build(self.build_folder, self.verbose)
+        cmake.build(self.build_folder, self.build_type, self.verbose)

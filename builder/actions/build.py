@@ -9,13 +9,14 @@ class BuildAction(Action):
             name,
             help="build the project",
         )
-        subparser.add_argument(
-            "-bt",
-            "--build-type",
-            choices=Defaults.supported_build_types,
-            default=Defaults.default_build_types,
-            help="build type [default: %(default)s]",
-        )
+        if Defaults.system == "windows":
+            subparser.add_argument(
+                "-bt",
+                "--build-type",
+                choices=Defaults.supported_build_types,
+                default=Defaults.default_build_types,
+                help="build type [default: %(default)s]",
+            )
         subparser.add_argument(
             "-b",
             "--build-folder",
@@ -23,6 +24,7 @@ class BuildAction(Action):
             help="the root build folder for Cmake generated and build files [default: %(default)s]",
         )
         subparser.add_argument(
+            "-v",
             "--verbose",
             action="store_true",
             help="enable verbose output",

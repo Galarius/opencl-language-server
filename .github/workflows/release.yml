@@ -24,107 +24,131 @@ jobs:
             release_name: Release ${{github.ref}}
             draft: true 
             prerelease: false
-  
+
   build_release:
     name: Build Release
     runs-on: ${{ matrix.config.os }}
     needs: create_release
     strategy:
       matrix:
-        config:
-          - os: ubuntu-20.04
-          - os: macos-latest
-          - os: windows-latest
+          config:
+            - os: windows-latest
+          python-version: [3.9]
+    
+    env:
+      CONAN_HOME: ${{ github.workspace }}/.conan-home
 
     steps:
-    - uses: actions/checkout@v2
-        
-    - name: Clone submodules
-      run: git submodule update --init
+      - uses: actions/checkout@v2
 
-    - name: Install OpenCL (Linux)
-      if: "contains(matrix.config.os, 'ubuntu')"
-      run: | 
-        sudo apt-get update
-        sudo apt-get install ocl-icd-opencl-dev opencl-headers
+      - name: Linux - Install prerequisites
+        if: "contains(matrix.config.os, 'ubuntu')"
+        run: |
+          sudo apt update
+          sudo apt install gcc-11 g++-11
 
-    - name: Prerequisites (Windows)
-      uses: microsoft/setup-msbuild@v1.1
-      if: "contains(matrix.config.os, 'windows')"
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python-version }}
 
-    - name: Install OpenCL (Windows)
-      if: "contains(matrix.config.os, 'windows')"
-      run: |
-        git clone https://github.com/KhronosGroup/OpenCL-Headers.git 
-        cd OpenCL-Headers 
-        cmake -S . -B build -DCMAKE_INSTALL_PREFIX=${{github.workspace}}/opencl
-        cmake --build build --target install
-        cd ${{github.workspace}}
-        git clone https://github.com/KhronosGroup/OpenCL-ICD-Loader
-        mv -v ${{github.workspace}}/opencl/include/* ${{github.workspace}}/OpenCL-ICD-Loader/inc
-        cd ${{github.workspace}}/OpenCL-ICD-Loader
-        mkdir build && cd build
-        cmake ..
-        msbuild OpenCL.vcxproj -property:Configuration=${{env.BUILD_TYPE}}
-        
-    - name: Configure CMake (MacOS | Linux)
-      if: "!contains(matrix.config.os, 'windows')"
-      run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
+      - name: Create virtual environment
+        run: python3 -m venv .pyenv
 
-    - name: Configure CMake (Windows)
-      if: "contains(matrix.config.os, 'windows')"
-      run: cmake -B ${{github.workspace}}/build -DOpenCL_FOUND=True -DOpenCL_LIBRARY=${{github.workspace}}/OpenCL-ICD-Loader/build/Release/OpenCL.lib -DOpenCL_LIBRARIES=${{github.workspace}}/OpenCL-ICD-Loader/build/Release/OpenCL.lib -DOpenCL_INCLUDE_DIR=${{github.workspace}}/OpenCL-ICD-Loader/inc
+      - name: Windows - Activate virtual environment
+        if: "contains(matrix.config.os, 'windows')"
+        run: .pyenv\Scripts\activate.bat
 
-    - name: Build
-      run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}}
+      - name: Unix - Activate virtual environment
+        if: "!contains(matrix.config.os, 'windows')"
+        run: source .pyenv/bin/activate
 
-    - name: Archive Artifact (MacOS)
-      if: "contains(matrix.config.os, 'macos')"
-      run: | 
-        cd ${{github.workspace}}/build/bin/
-        tar -czvf opencl-language-server-darwin-x86_64.tar.gz opencl-language-server
+      - name: Setup environment
+        run: |
+          pip3 install wheel
+          pip3 install -r requirements.txt
+          conan profile detect
 
-    - name: Archive Artifact (Linux)
-      if: "contains(matrix.config.os, 'ubuntu')"
-      run: |
-        cd ${{github.workspace}}/build/bin/ 
-        tar -czvf opencl-language-server-linux-x86_64.tar.gz opencl-language-server
-      
-    - name: Archive Artifact (Windows)
-      if: "contains(matrix.config.os, 'windows')"
-      run: | 
-        cd ${{github.workspace}}/build/bin/Release/
-        7z a -tzip opencl-language-server-win32-x86_64.zip opencl-language-server.exe
-          
-    - name: Upload Artifact (MacOS)
-      if: "contains(matrix.config.os, 'macos')"
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{github.token}}
-      with:
-        upload_url: ${{needs.create_release.outputs.upload_url}}
-        asset_path: ${{github.workspace}}/build/bin/opencl-language-server-darwin-x86_64.tar.gz
-        asset_name: opencl-language-server-darwin-x86_64.tar.gz
-        asset_content_type: application/gzip
-        
-    - name: Upload Artifact (Linux)
-      if: "contains(matrix.config.os, 'ubuntu')"
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{github.token}}
-      with:
-        upload_url: ${{needs.create_release.outputs.upload_url}}
-        asset_path: ${{github.workspace}}/build/bin/opencl-language-server-linux-x86_64.tar.gz
-        asset_name: opencl-language-server-linux-x86_64.tar.gz
-        asset_content_type: application/gzip
 
-    - name: Upload Artifact (Windows)
-      if: "contains(matrix.config.os, 'windows')"
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{github.token}}
-      with:
-        upload_url: ${{needs.create_release.outputs.upload_url}}
-        asset_path: ${{github.workspace}}/build/bin/Release/opencl-language-server-win32-x86_64.zip
-        asset_name: opencl-language-server-win32-x86_64.zip
-        asset_content_type: application/zip
+      - name: Windows - Configure & Build (Release)
+        if: "contains(matrix.config.os, 'windows')"
+        run: |
+          python3 build.py -v conan-install -pr:h=profiles/windows.release.x86_64
+          python3 build.py -v configure -v -t .conan-install/build/generators/conan_toolchain.cmake -bt Release
+          python3 build.py -v build -v -bt Release
+
+      - name: Windows - Archive Artifact
+        if: "contains(matrix.config.os, 'windows')"
+        run: | 
+          cd ${{github.workspace}}/.build/Release
+          7z a -tzip opencl-language-server-win32-x86_64.zip opencl-language-server.exe
+
+      - name: Windows - Upload Artifact
+        if: "contains(matrix.config.os, 'windows')"
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{github.token}}
+        with:
+          upload_url: ${{needs.create_release.outputs.upload_url}}
+          asset_path: ${{github.workspace}}/.build/Release/opencl-language-server-win32-x86_64.zip
+          asset_name: opencl-language-server-win32-x86_64.zip
+          asset_content_type: application/zip
+
+
+      - name: Linux - Configure & Build (Release)
+        if: "contains(matrix.config.os, 'ubuntu')"
+        run: |
+          ./build.py conan-install -pr:h=profiles/linux.release.x86_64
+          ./build.py configure -t .conan-install/build/Release/generators/conan_toolchain.cmake -bt Release
+          ./build.py build
+
+      - name: Linux - Archive Artifact
+        if: "contains(matrix.config.os, 'ubuntu')"
+        run: |
+          cd ${{github.workspace}}/.build/
+          tar -czvf opencl-language-server-linux-x86_64.tar.gz opencl-language-server
+
+      - name: Linux - Upload Artifact
+        if: "contains(matrix.config.os, 'ubuntu')"
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{github.token}}
+        with:
+          upload_url: ${{needs.create_release.outputs.upload_url}}
+          asset_path: ${{github.workspace}}/.build/opencl-language-server-linux-x86_64.tar.gz
+          asset_name: opencl-language-server-linux-x86_64.tar.gz
+          asset_content_type: application/gzip
+
+
+      - name: Mac - Configure & Build (Release)
+        if: "contains(matrix.config.os, 'macos')"
+        run: |
+          ./build.py conan-install -o .conan-x86_64 -pr:h profiles/darwin.release.x86_64
+          ./build.py configure -t .conan-x86_64/build/Release/generators/conan_toolchain.cmake -b .build-x86_64 -bt Release
+          ./build.py build -b .build-x86_64
+
+          ./build.py conan-install -o .conan-armv8 -pr:h profiles/darwin.release.armv8
+          ./build.py configure -t .conan-armv8/build/Release/generators/conan_toolchain.cmake -b .build-armv8 -bt Release
+          ./build.py build -b .build-armv8
+
+          mkdir -p .build-universal/
+          lipo -create -output .build-universal/opencl-language-server .build-x86_64/opencl-language-server .build-armv8/opencl-language-server
+          lipo -archs .build-universal/opencl-language-server 
+
+      - name: Mac - Archive Artifact
+        if: "contains(matrix.config.os, 'macos')"
+        run: | 
+          cd ${{github.workspace}}/.build-universal/
+          tar -czvf opencl-language-server-darwin-fat.tar.gz opencl-language-server
+
+      - name: Mac - Upload Artifact
+        if: "contains(matrix.config.os, 'macos')"
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{github.token}}
+        with:
+          upload_url: ${{needs.create_release.outputs.upload_url}}
+          asset_path: ${{github.workspace}}/.build-universal/opencl-language-server-darwin-fat.tar.gz
+          asset_name: opencl-language-server-darwin-fat.tar.gz
+          asset_content_type: application/gzip
+
