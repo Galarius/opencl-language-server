@@ -10,7 +10,7 @@
 
 using namespace nlohmann;
 
-namespace vscode::opencl {
+namespace ocls {
 
 namespace {
 constexpr char logger[] = "jrpc";
@@ -276,4 +276,4 @@ void JsonRPC::WriteError(JsonRPC::ErrorCode errorCode, const std::string& messag
     Write(obj);
 }
 
-} // namespace vscode::opencl
+} // namespace ocls

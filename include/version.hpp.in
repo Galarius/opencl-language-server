@@ -1,6 +1,6 @@
 #pragma once
 
-namespace vscode::opencl {
+namespace ocls {
 
 const char version[] = "${PROJECT_VERSION}";
 

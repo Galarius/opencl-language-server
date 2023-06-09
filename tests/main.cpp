@@ -13,7 +13,7 @@
 #include <spdlog/spdlog.h>
 #include <spdlog/sinks/null_sink.h>
 
-using namespace vscode::opencl;
+using namespace ocls;
 using namespace nlohmann;
 
 namespace {

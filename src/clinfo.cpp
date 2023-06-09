@@ -13,8 +13,8 @@
 #include <unordered_map>
 
 using namespace nlohmann;
-using namespace vscode::opencl::utils;
-using vscode::opencl::ICLInfo;
+using namespace ocls::utils;
+using ocls::ICLInfo;
 
 namespace {
 
@@ -504,11 +504,11 @@ public:
 
 } // namespace
 
-namespace vscode::opencl {
+namespace ocls {
 
 std::shared_ptr<ICLInfo> CreateCLInfo()
 {
     return std::shared_ptr<ICLInfo>(new CLInfo());
 }
 
-} // namespace vscode::opencl
+} // namespace ocls

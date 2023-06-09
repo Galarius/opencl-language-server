@@ -14,7 +14,7 @@
 #include <string>
 #include <vector>
 
-namespace vscode::opencl::utils {
+namespace ocls::utils {
 
 std::string GenerateId();
 void Trim(std::string& s);
@@ -49,4 +49,4 @@ std::uint_fast32_t CRC32(InputIterator first, InputIterator last)
                });
 }
 
-} // namespace vscode::opencl::utils
+} // namespace ocls::utils

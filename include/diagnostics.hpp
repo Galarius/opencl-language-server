@@ -13,7 +13,7 @@
 #include <nlohmann/json.hpp>
 #include <string>
 
-namespace vscode::opencl {
+namespace ocls {
 
 struct Source
 {
@@ -31,4 +31,4 @@ struct IDiagnostics
 
 std::shared_ptr<IDiagnostics> CreateDiagnostics(std::shared_ptr<ICLInfo> clInfo);
 
-} // namespace vscode::opencl
+} // namespace ocls

@@ -17,7 +17,7 @@
 
 using namespace nlohmann;
 
-namespace vscode::opencl {
+namespace ocls {
 
 constexpr char logger[] = "lsp";
 
@@ -325,4 +325,4 @@ std::shared_ptr<ILSPServer> CreateLSPServer()
     return std::shared_ptr<ILSPServer>(new LSPServer());
 }
 
-} // namespace vscode::opencl
+} // namespace ocls
