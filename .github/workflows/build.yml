@@ -25,7 +25,7 @@ jobs:
       with:
         python-version: ${{ matrix.python-version }}
 
-    - name: Install prerequisites (Linux)
+    - name: Linux - Install prerequisites
       if: runner.os == 'Linux'
       run: |
          sudo apt update
@@ -34,11 +34,11 @@ jobs:
     - name: Create virtual environment
       run: python3 -m venv .pyenv
 
-    - name: Activate virtual environment (Windows)
+    - name: Windows - Activate virtual environment
       if: runner.os == 'Windows'
       run: .pyenv\Scripts\activate.bat
 
-    - name: Activate virtual environment (Unix)
+    - name: Unix - Activate virtual environment
       if: runner.os != 'Windows'
       run: source .pyenv/bin/activate
 
