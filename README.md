@@ -38,8 +38,6 @@ You can configure diagnostics with `json-rpc` request during the intitialization
 | |  *Run `./opencl-language-server --clinfo` to get information about available OpenCL devices including identifiers.* |
 | `maxNumberOfProblems` | Controls the maximum number of problems produced by the language server. |
 
-To enable file logging, pass the following parameters:
-
 ## Development
 
 See [development notes](DEV.md).
