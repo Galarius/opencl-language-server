@@ -55,7 +55,7 @@ size_t GetDevicePowerIndex(const cl::Device& device)
 
 } // namespace
 
-namespace vscode::opencl {
+namespace ocls {
 
 class Diagnostics final : public IDiagnostics
 {
@@ -291,4 +291,4 @@ std::shared_ptr<IDiagnostics> CreateDiagnostics(std::shared_ptr<ICLInfo> clInfo)
     return std::make_shared<Diagnostics>(std::move(clInfo));
 }
 
-} // namespace vscode::opencl
+} // namespace ocls

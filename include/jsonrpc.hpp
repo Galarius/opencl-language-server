@@ -14,7 +14,7 @@
 #include <regex>
 #include <unordered_map>
 
-namespace vscode::opencl {
+namespace ocls {
 
 class JsonRPC
 {
@@ -92,4 +92,4 @@ private:
     std::regex m_headerRegex {"([\\w-]+): (.+)\\r\\n(?:([^:]+)\\r\\n)?"};
 };
 
-} // namespace vscode::opencl
+} // namespace ocls

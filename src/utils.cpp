@@ -14,7 +14,7 @@
 #include <spdlog/spdlog.h>
 #include <sstream>
 
-namespace vscode::opencl::utils {
+namespace ocls::utils {
 
 std::string GenerateId()
 {
@@ -132,4 +132,4 @@ std::array<std::uint_fast32_t, 256> GenerateCRCLookupTable()
 }
 } // namespace internal
 
-} // namespace vscode::opencl::utils
+} // namespace ocls::utils

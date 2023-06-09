@@ -24,7 +24,7 @@
     #include <stdio.h>
 #endif
 
-using namespace vscode::opencl;
+using namespace ocls;
 
 namespace {
 
@@ -110,7 +110,7 @@ int main(int argc, char* argv[])
     app.add_flag_callback(
         "-v,--version",
         []() {
-            std::cout << vscode::opencl::version << std::endl;
+            std::cout << ocls::version << std::endl;
             exit(0);
         },
         "Show version");

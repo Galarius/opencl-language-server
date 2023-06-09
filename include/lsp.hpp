@@ -9,7 +9,7 @@
 
 #include <memory>
 
-namespace vscode::opencl {
+namespace ocls {
 
 struct ILSPServer
 {
@@ -19,4 +19,4 @@ struct ILSPServer
 
 std::shared_ptr<ILSPServer> CreateLSPServer();
 
-} // namespace vscode::opencl
+} // namespace ocls

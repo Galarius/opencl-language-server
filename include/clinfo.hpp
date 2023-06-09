@@ -13,7 +13,7 @@
 #include <nlohmann/json.hpp>
 #include <string>
 
-namespace vscode::opencl {
+namespace ocls {
 
 struct ICLInfo
 {
@@ -28,4 +28,4 @@ struct ICLInfo
 
 std::shared_ptr<ICLInfo> CreateCLInfo();
 
-} // namespace vscode::opencl
+} // namespace ocls
