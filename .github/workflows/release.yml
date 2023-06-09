@@ -33,6 +33,8 @@ jobs:
       matrix:
           config:
             - os: windows-latest
+            - os: macos-latest
+            - os: ubuntu-20.04
           python-version: [3.9]
     
     env:
@@ -73,9 +75,9 @@ jobs:
       - name: Windows - Configure & Build (Release)
         if: "contains(matrix.config.os, 'windows')"
         run: |
-          python3 build.py -v conan-install -pr:h=profiles/windows.release.x86_64
-          python3 build.py -v configure -v -t .conan-install/build/generators/conan_toolchain.cmake -bt Release
-          python3 build.py -v build -v -bt Release
+          python3 build.py conan-install -pr:h=profiles/windows.release.x86_64
+          python3 build.py configure -t .conan-install/build/generators/conan_toolchain.cmake -bt Release
+          python3 build.py build -bt Release
 
       - name: Windows - Archive Artifact
         if: "contains(matrix.config.os, 'windows')"
