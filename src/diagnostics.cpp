@@ -119,7 +119,7 @@ void Diagnostics::SetOpenCLDevice(uint32_t identifier)
         spdlog::get(logger)->info("Found OpenCL devices: {}", devices.size());
         if (devices.size() == 0)
         {
-            return;
+            continue;
         }
 
         size_t maxPowerIndex = 0;
