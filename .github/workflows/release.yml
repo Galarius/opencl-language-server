@@ -140,17 +140,45 @@ jobs:
       - name: Mac - Archive Artifact
         if: "contains(matrix.config.os, 'macos')"
         run: | 
+          cd ${{github.workspace}}/.build-x86_64/
+          tar -czvf opencl-language-server-darwin-x86_64.tar.gz opencl-language-server
+          
+          cd ${{github.workspace}}/.build-armv8/
+          tar -czvf opencl-language-server-darwin-arm64.tar.gz opencl-language-server
+          
           cd ${{github.workspace}}/.build-universal/
-          tar -czvf opencl-language-server-darwin-fat.tar.gz opencl-language-server
+          tar -czvf opencl-language-server-darwin-universal.tar.gz opencl-language-server
 
-      - name: Mac - Upload Artifact
+      - name: Mac - Upload Artifact (x86_64)
         if: "contains(matrix.config.os, 'macos')"
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{github.token}}
         with:
           upload_url: ${{needs.create_release.outputs.upload_url}}
-          asset_path: ${{github.workspace}}/.build-universal/opencl-language-server-darwin-fat.tar.gz
-          asset_name: opencl-language-server-darwin-fat.tar.gz
+          asset_path: ${{github.workspace}}/.build-x86_64/opencl-language-server-darwin-x86_64.tar.gz
+          asset_name: opencl-language-server-darwin-x86_64.tar.gz
+          asset_content_type: application/gzip
+      
+      - name: Mac - Upload Artifact (armv8)
+        if: "contains(matrix.config.os, 'macos')"
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{github.token}}
+        with:
+          upload_url: ${{needs.create_release.outputs.upload_url}}
+          asset_path: ${{github.workspace}}/.build-armv8/opencl-language-server-darwin-arm64.tar.gz
+          asset_name: opencl-language-server-darwin-arm64.tar.gz
+          asset_content_type: application/gzip
+      
+      - name: Mac - Upload Artifact (universal)
+        if: "contains(matrix.config.os, 'macos')"
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{github.token}}
+        with:
+          upload_url: ${{needs.create_release.outputs.upload_url}}
+          asset_path: ${{github.workspace}}/.build-universal/opencl-language-server-darwin-universal.tar.gz
+          asset_name: opencl-language-server-darwin-universal.tar.gz
           asset_content_type: application/gzip
 
