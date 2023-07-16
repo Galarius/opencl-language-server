@@ -1,4 +1,4 @@
-cmake_minimum_required (VERSION 3.17)
+cmake_minimum_required (VERSION 3.16)
 
 file(READ "version" VERSION_OUTPUT)
 string(STRIP ${VERSION_OUTPUT} PACKAGE_VERSION)
