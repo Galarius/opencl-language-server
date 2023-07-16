@@ -68,10 +68,16 @@ class OpenCLLanguageServerConanfile(ConanFile):
     def package(self):
         cmake = CMake(self)
         cmake.install()
+        build_folder = (
+            os.path.join(self.build_folder, str(self.settings.build_type))
+            if self.settings.os == "Windows"
+            else self.build_folder
+        )
+        bin_ext = ".exe" if self.settings.os == "Windows" else ""
         copy(
             self,
-            "opencl-language-server",
-            self.build_folder,
+            f"opencl-language-server{bin_ext}",
+            build_folder,
             os.path.join(self.package_folder, "bin"),
         )
         copy(
