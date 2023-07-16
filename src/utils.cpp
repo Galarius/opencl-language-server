@@ -94,14 +94,6 @@ bool EndsWith(const std::string& str, const std::string& suffix)
     return str.size() >= suffix.size() && 0 == str.compare(str.size() - suffix.size(), suffix.size(), suffix);
 }
 
-void RemoveNullTerminator(std::string& str)
-{
-    if (EndsWith(str, "\0"))
-    {
-        str.pop_back();
-    }
-}
-
 namespace internal {
 // Generates a lookup table for the checksums of all 8-bit values.
 std::array<std::uint_fast32_t, 256> GenerateCRCLookupTable()
