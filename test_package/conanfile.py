@@ -17,18 +17,15 @@ class TestPackageConan(ConanFile):
 
     def test(self):
         if not can_run(self):
-            return        
-        
-        if self.settings.os == "Windows":
-            return  # TODO: Fix "'opencl-language-server.exe' is not recognized as an internal or external command, operable program or batch file."
-        
+            return
+
         bin_ext = ".exe" if self.settings.os == "Windows" else ""
         opencl_ls = f"opencl-language-server{bin_ext}"
 
         output = StringIO()
         self.run(f"{opencl_ls} --version", output)
         assert len(output.getvalue()) > 0
-        
+
         output = StringIO()
         self.run(f"{opencl_ls} --clinfo", output)
         clinfo = json.loads(output.getvalue())
