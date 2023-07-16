@@ -21,7 +21,6 @@ void Trim(std::string& s);
 std::vector<std::string> SplitString(const std::string& str, const std::string& pattern);
 std::string UriToPath(const std::string& uri);
 bool EndsWith(const std::string& str, const std::string& suffix);
-void RemoveNullTerminator(std::string& str);
 
 namespace internal {
 // Generates a lookup table for the checksums of all 8-bit values.

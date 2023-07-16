@@ -261,7 +261,6 @@ json::object_t GetDeviceJSONInfo(const cl::Device& device)
                 {
                     std::string value;
                     device.getInfo(property.field, &value);
-                    RemoveNullTerminator(value);
                     if (property.name == "CL_DEVICE_EXTENSIONS")
                     {
                         info[property.name] = GetExtensions(value);
@@ -418,7 +417,6 @@ json GetPlatformJSONInfo(const cl::Platform& platform)
         {
             std::string value;
             platform.getInfo(property.field, &value);
-            RemoveNullTerminator(value);
             info[property.name] = value;
         }
         catch (const cl::Error& err)
@@ -430,7 +428,6 @@ json GetPlatformJSONInfo(const cl::Platform& platform)
     info["PLATFORM_ID"] = CalculatePlatformID(platform);
 
     auto extensions = platform.getInfo<CL_PLATFORM_EXTENSIONS>();
-    RemoveNullTerminator(extensions);
     info["CL_PLATFORM_EXTENSIONS"] = GetExtensions(extensions);
 
     try
@@ -491,10 +488,6 @@ public:
         auto vendor = device.getInfo<CL_DEVICE_VENDOR>();
         auto vendorID = device.getInfo<CL_DEVICE_VENDOR_ID>();
         auto driverVersion = device.getInfo<CL_DRIVER_VERSION>();
-        RemoveNullTerminator(name);
-        RemoveNullTerminator(version);
-        RemoveNullTerminator(vendor);
-        RemoveNullTerminator(driverVersion);
         auto description = "name: " + std::move(name) + "; " + "type: " + std::to_string(type) + "; " +
             "version: " + std::move(version) + "; " + "vendor: " + std::move(vendor) + "; " +
             "vendorID: " + std::to_string(vendorID) + "; " + "driverVersion: " + std::move(driverVersion);

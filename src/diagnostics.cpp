@@ -255,7 +255,6 @@ nlohmann::json Diagnostics::Get(const Source& source)
     }
 
     buildLog = BuildSource(source.text);
-    utils::RemoveNullTerminator(buildLog);
     spdlog::get(logger)->trace("BuildLog:\n", buildLog);
 
     return BuildDiagnostics(buildLog, srcName);
