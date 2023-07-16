@@ -1,1 +1,2 @@
+wheel
 conan >= 2.0
