@@ -291,7 +291,7 @@ int LSPServer::Run()
             std::cout << message << std::flush;
         #endif    
     });
-    // clang-format off
+    // clang-format on
     
     spdlog::get(logger)->info("Listening...");
     char c;
