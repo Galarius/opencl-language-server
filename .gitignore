@@ -20,6 +20,7 @@ xcuserdata/
 *.xccheckout
 *.xcscmblueprint
 .DS_Store
+Testing
 
 ## Conan
 .conan*
@@ -33,7 +34,6 @@ test_package/*
 ## VS Code
 .vscode
 CMakePresets.json
-
 
 ## Python
 .pyenv
