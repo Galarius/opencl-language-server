@@ -2,7 +2,7 @@
 //  jsonrpc.hpp
 //  opencl-language-server
 //
-//  Created by Ilya Shoshin (Galarius) on 7/16/21.
+//  Created by Ilia Shoshin on 7/16/21.
 //
 
 #pragma once
@@ -22,6 +22,7 @@ class JsonRPC
     using OutputCallbackFunc = std::function<void(const std::string&)>;
 
 public:
+    // clang-format off
     enum class ErrorCode : int
     {
         ///@{
@@ -30,12 +31,12 @@ public:
         InvalidRequest = -32600, ///< Invalid Request    The JSON sent is not a valid Request object.
         MethodNotFound = -32601, ///< Method not found    The method does not exist / is not available.
         InvalidParams = -32602,  ///< Invalid params    Invalid method parameter(s).
-        InternalError =
-            -32603, ///< Internal error    Internal JSON-RPC error.
-                    // -32000 to -32099    Server error    Reserved for implementation-defined server-errors.
+        InternalError = -32603,  ///< Internal error    Internal JSON-RPC error.
+        // -32000 to -32099    Server error    Reserved for implementation-defined server-errors.
         NotInitialized = -32002 ///< The first client's message is not equal to "initialize"
-                                ///@}
+        ///@}
     };
+    // clang-format on
 
     friend std::ostream& operator<<(std::ostream& out, ErrorCode const& code)
     {
@@ -65,15 +66,24 @@ public:
     /**
      Send trace message to client.
      */
-    void LogTrace(const std::string& message, const std::string& verbose = "");
+    void WriteTrace(const std::string& message, const std::string& verbose);
     void WriteError(JsonRPC::ErrorCode errorCode, const std::string& message) const;
 
 private:
+    void ProcessBufferContent();
+    void ProcessMethod();
+    void ProcessBufferHeader();
+
     void OnInitialize();
     void OnTracingChanged(const nlohmann::json& data);
     bool ReadHeader();
     void FireMethodCallback();
     void FireRespondCallback();
+
+    void LogBufferContent() const;
+    void LogMessage(const std::string& message) const;
+    void LogAndHandleParseError(std::exception& e);
+    void LogAndHandleUnexpectedMessage();
 
 private:
     std::string m_method;

@@ -2,7 +2,7 @@
 //  jsonrpc.cpp
 //  opencl-language-server
 //
-//  Created by Ilya Shoshin (Galarius) on 7/16/21.
+//  Created by Ilia Shoshin on 7/16/21.
 //
 
 #include "jsonrpc.hpp"
@@ -13,8 +13,15 @@ using namespace nlohmann;
 namespace ocls {
 
 namespace {
+
 constexpr char logger[] = "jrpc";
 constexpr char LE[] = "\r\n";
+
+inline std::string FormatBool(bool flag)
+{
+    return flag ? "yes" : "no";
+}
+
 } // namespace
 
 void JsonRPC::RegisterMethodCallback(const std::string& method, InputCallbackFunc&& func)
@@ -38,73 +45,14 @@ void JsonRPC::RegisterOutputCallback(OutputCallbackFunc&& func)
 void JsonRPC::Consume(char c)
 {
     m_buffer += c;
+
     if (m_validHeader)
     {
-        if (m_buffer.length() != m_contentLength)
-            return;
-        try
-        {
-            spdlog::get(logger)->debug("");
-            spdlog::get(logger)->debug(">>>>>>>>>>>>>>>>");
-            for (auto& header : m_headers)
-                spdlog::get(logger)->debug(header.first, ": ", header.second);
-            spdlog::get(logger)->debug(m_buffer);
-            spdlog::get(logger)->debug(">>>>>>>>>>>>>>>>");
-            spdlog::get(logger)->debug("");
-
-            m_body = json::parse(m_buffer);
-            const auto method = m_body["method"];
-            if (method.is_string())
-            {
-                m_method = method.get<std::string>();
-                if (m_method == "initialize")
-                {
-                    OnInitialize();
-                }
-                else if (!m_initialized)
-                {
-                    spdlog::get(logger)->error("Unexpected first message: '{}'", m_method);
-                    WriteError(ErrorCode::NotInitialized, "Server was not initialized.");
-                    return;
-                }
-                else if (m_method == "$/setTrace")
-                {
-                    OnTracingChanged(m_body);
-                }
-                FireMethodCallback();
-            }
-            else
-            {
-                FireRespondCallback();
-            }
-            m_isProcessing = false;
-        }
-        catch (std::exception& e)
-        {
-            spdlog::get(logger)->error("Failed to parse request with reason: '{}'\n{}", e.what(), "\n", m_buffer);
-            m_buffer.clear();
-            WriteError(ErrorCode::ParseError, "Failed to parse request");
-            return;
-        }
+        ProcessBufferContent();
     }
     else
     {
-        if (ReadHeader())
-            m_buffer.clear();
-
-        if (m_buffer == LE)
-        {
-            m_buffer.clear();
-            m_validHeader = m_contentLength > 0;
-            if (m_validHeader)
-            {
-                m_buffer.reserve(m_contentLength);
-            }
-            else
-            {
-                WriteError(ErrorCode::InvalidRequest, "Invalid content length");
-            }
-        }
+        ProcessBufferHeader();
     }
 }
 
@@ -128,11 +76,7 @@ void JsonRPC::Write(const json& data) const
         message.append(LE);
         message.append(content);
 
-        spdlog::get(logger)->debug("");
-        spdlog::get(logger)->debug("<<<<<<<<<<<<<<<<");
-        spdlog::get(logger)->debug(message);
-        spdlog::get(logger)->debug("<<<<<<<<<<<<<<<<");
-        spdlog::get(logger)->debug("");
+        LogMessage(message);
 
         m_outputCallback(message);
     }
@@ -153,7 +97,7 @@ void JsonRPC::Reset()
     m_isProcessing = true;
 }
 
-void JsonRPC::LogTrace(const std::string& message, const std::string& verbose)
+void JsonRPC::WriteTrace(const std::string& message, const std::string& verbose)
 {
     if (!m_tracing)
     {
@@ -166,11 +110,88 @@ void JsonRPC::LogTrace(const std::string& message, const std::string& verbose)
     {
         spdlog::get(logger)->debug("JRPC verbose tracing is disabled");
         spdlog::get(logger)->trace("The verbose message was: {}", verbose);
+    }
+
+    // clang-format off
+    Write(json({
+        {"method", "$/logTrace"}, 
+        {"params", {
+            {"message", message}, 
+            {"verbose", m_verbosity ? verbose : ""
+        }}}
+    }));
+    // clang-format on
+}
+
+// private
+
+void JsonRPC::ProcessBufferContent()
+{
+    if (m_buffer.length() != m_contentLength)
+    {
         return;
     }
 
-    Write(
-        json({{"method", "$/logTrace"}, {"params", {{"message", message}, {"verbose", m_verbosity ? verbose : ""}}}}));
+    try
+    {
+        LogBufferContent();
+
+        m_body = json::parse(m_buffer);
+        const auto method = m_body["method"];
+        if (method.is_string())
+        {
+            m_method = method.get<std::string>();
+            ProcessMethod();
+        }
+        else
+        {
+            FireRespondCallback();
+        }
+        m_isProcessing = false;
+    }
+    catch (std::exception& e)
+    {
+        LogAndHandleParseError(e);
+    }
+}
+
+void JsonRPC::ProcessMethod()
+{
+    if (m_method == "initialize")
+    {
+        OnInitialize();
+    }
+    else if (!m_initialized)
+    {
+        return LogAndHandleUnexpectedMessage();
+    }
+    else if (m_method == "$/setTrace")
+    {
+        OnTracingChanged(m_body);
+    }
+    FireMethodCallback();
+}
+
+void JsonRPC::ProcessBufferHeader()
+{
+    if (ReadHeader())
+    {
+        m_buffer.clear();
+    }
+
+    if (m_buffer == LE)
+    {
+        m_buffer.clear();
+        m_validHeader = m_contentLength > 0;
+        if (m_validHeader)
+        {
+            m_buffer.reserve(m_contentLength);
+        }
+        else
+        {
+            WriteError(ErrorCode::InvalidRequest, "Invalid content length");
+        }
+    }
 }
 
 void JsonRPC::OnInitialize()
@@ -182,7 +203,7 @@ void JsonRPC::OnInitialize()
         m_verbosity = traceValue == "verbose";
         m_initialized = true;
         spdlog::get(logger)->debug(
-            "Tracing options: is verbose: {}, is on: {}", m_verbosity ? "yes" : "no", m_tracing ? "yes" : "no");
+            "Tracing options: is verbose: {}, is on: {}", FormatBool(m_verbosity), FormatBool(m_tracing));
     }
     catch (std::exception& err)
     {
@@ -198,9 +219,7 @@ void JsonRPC::OnTracingChanged(const json& data)
         m_tracing = traceValue != "off";
         m_verbosity = traceValue == "verbose";
         spdlog::get(logger)->debug(
-            "Tracing options were changed, is verbose: {}, is on: {}",
-            m_verbosity ? "yes" : "no",
-            m_tracing ? "yes" : "no");
+            "Tracing options were changed, is verbose: {}, is on: {}", FormatBool(m_verbosity), FormatBool(m_tracing));
     }
     catch (std::exception& err)
     {
@@ -219,7 +238,9 @@ bool JsonRPC::ReadHeader()
         std::string key = match.str(1);
         std::string value = match.str(2);
         if (key == "Content-Length")
+        {
             m_contentLength = std::stoi(value);
+        }
         m_headers[key] = value;
         ++next;
     }
@@ -244,7 +265,7 @@ void JsonRPC::FireMethodCallback()
         const bool isRequest = m_body["params"]["id"] != nullptr;
         const bool mustRespond = isRequest || m_method.rfind("$/", 0) == std::string::npos;
         spdlog::get(logger)->debug(
-            "Got request: {}, respond is required: {}", isRequest ? "yes" : "no", mustRespond ? "yes" : "no");
+            "Got request: {}, respond is required: {}", FormatBool(isRequest), FormatBool(mustRespond));
         if (mustRespond)
         {
             WriteError(ErrorCode::MethodNotFound, "Method '" + m_method + "' is not supported.");
@@ -274,6 +295,51 @@ void JsonRPC::WriteError(JsonRPC::ErrorCode errorCode, const std::string& messag
              {"message", message},
          }}};
     Write(obj);
+}
+
+void JsonRPC::LogBufferContent() const
+{
+    if (spdlog::get_level() > spdlog::level::debug)
+    {
+        return;
+    }
+
+    spdlog::get(logger)->debug("");
+    spdlog::get(logger)->debug(">>>>>>>>>>>>>>>>");
+    for (auto& header : m_headers)
+    {
+        spdlog::get(logger)->debug(header.first, ": ", header.second);
+    }
+    spdlog::get(logger)->debug(m_buffer);
+    spdlog::get(logger)->debug(">>>>>>>>>>>>>>>>");
+    spdlog::get(logger)->debug("");
+}
+
+void JsonRPC::LogMessage(const std::string& message) const
+{
+    if (spdlog::get_level() > spdlog::level::debug)
+    {
+        return;
+    }
+
+    spdlog::get(logger)->debug("");
+    spdlog::get(logger)->debug("<<<<<<<<<<<<<<<<");
+    spdlog::get(logger)->debug(message);
+    spdlog::get(logger)->debug("<<<<<<<<<<<<<<<<");
+    spdlog::get(logger)->debug("");
+}
+
+void JsonRPC::LogAndHandleParseError(std::exception& e)
+{
+    spdlog::get(logger)->error("Failed to parse request with reason: '{}'\n{}", e.what(), "\n", m_buffer);
+    m_buffer.clear();
+    WriteError(ErrorCode::ParseError, "Failed to parse request");
+}
+
+void JsonRPC::LogAndHandleUnexpectedMessage()
+{
+    spdlog::get(logger)->error("Unexpected first message: '{}'", m_method);
+    WriteError(ErrorCode::NotInitialized, "Server was not initialized.");
 }
 
 } // namespace ocls
