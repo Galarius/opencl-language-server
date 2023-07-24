@@ -8,98 +8,58 @@
 #pragma once
 
 #include <functional>
-#include <iostream>
+#include <memory>
 #include <nlohmann/json.hpp>
-#include <optional>
-#include <regex>
-#include <unordered_map>
 
 namespace ocls {
 
-class JsonRPC
+using InputCallbackFunc = std::function<void(const nlohmann::json&)>;
+using OutputCallbackFunc = std::function<void(const std::string&)>;
+
+// clang-format off
+enum class JRPCErrorCode : int
 {
-    using InputCallbackFunc = std::function<void(const nlohmann::json&)>;
-    using OutputCallbackFunc = std::function<void(const std::string&)>;
+    ///@{
+    ParseError = -32700,     ///< Parse error    Invalid JSON was received by the server. An error occurred on the
+                             ///< server while parsing the JSON text.
+    InvalidRequest = -32600, ///< Invalid Request    The JSON sent is not a valid Request object.
+    MethodNotFound = -32601, ///< Method not found    The method does not exist / is not available.
+    InvalidParams = -32602,  ///< Invalid params    Invalid method parameter(s).
+    InternalError = -32603,  ///< Internal error    Internal JSON-RPC error.
+    // -32000 to -32099    Server error    Reserved for implementation-defined server-errors.
+    NotInitialized = -32002 ///< The first client's message is not equal to "initialize"
+    ///@}
+};
+// clang-format on
 
-public:
-    // clang-format off
-    enum class ErrorCode : int
-    {
-        ///@{
-        ParseError = -32700,     ///< Parse error    Invalid JSON was received by the server. An error occurred on the
-                                 ///< server while parsing the JSON text.
-        InvalidRequest = -32600, ///< Invalid Request    The JSON sent is not a valid Request object.
-        MethodNotFound = -32601, ///< Method not found    The method does not exist / is not available.
-        InvalidParams = -32602,  ///< Invalid params    Invalid method parameter(s).
-        InternalError = -32603,  ///< Internal error    Internal JSON-RPC error.
-        // -32000 to -32099    Server error    Reserved for implementation-defined server-errors.
-        NotInitialized = -32002 ///< The first client's message is not equal to "initialize"
-        ///@}
-    };
-    // clang-format on
-
-    friend std::ostream& operator<<(std::ostream& out, ErrorCode const& code)
-    {
-        out << static_cast<int64_t>(code);
-        return out;
-    }
-
+struct IJsonRPC
+{
     /**
      Register callback to be notified on the specific method notification.
      All unregistered notifications will be responded with MethodNotFound automatically.
-     */
-    void RegisterMethodCallback(const std::string& method, InputCallbackFunc&& func);
+    */
+    virtual void RegisterMethodCallback(const std::string& method, InputCallbackFunc&& func) = 0;
     /**
      Register callback to be notified on client responds to server (our) requests.
      */
-    void RegisterInputCallback(InputCallbackFunc&& func);
+    virtual void RegisterInputCallback(InputCallbackFunc&& func) = 0;
     /**
      Register callback to be notified when server is going to send the final message to the client.
      Basically it should be redirected to the stdout.
      */
-    void RegisterOutputCallback(OutputCallbackFunc&& func);
+    virtual void RegisterOutputCallback(OutputCallbackFunc&& func) = 0;
 
-    void Consume(char c);
-    bool IsReady() const;
-    void Write(const nlohmann::json& data) const;
-    void Reset();
+    virtual void Consume(char c) = 0;
+    virtual bool IsReady() const = 0;
+    virtual void Write(const nlohmann::json& data) const = 0;
+    virtual void Reset() = 0;
     /**
      Send trace message to client.
      */
-    void WriteTrace(const std::string& message, const std::string& verbose);
-    void WriteError(JsonRPC::ErrorCode errorCode, const std::string& message) const;
-
-private:
-    void ProcessBufferContent();
-    void ProcessMethod();
-    void ProcessBufferHeader();
-
-    void OnInitialize();
-    void OnTracingChanged(const nlohmann::json& data);
-    bool ReadHeader();
-    void FireMethodCallback();
-    void FireRespondCallback();
-
-    void LogBufferContent() const;
-    void LogMessage(const std::string& message) const;
-    void LogAndHandleParseError(std::exception& e);
-    void LogAndHandleUnexpectedMessage();
-
-private:
-    std::string m_method;
-    std::string m_buffer;
-    nlohmann::json m_body;
-    std::unordered_map<std::string, std::string> m_headers;
-    std::unordered_map<std::string, InputCallbackFunc> m_callbacks;
-    OutputCallbackFunc m_outputCallback;
-    InputCallbackFunc m_respondCallback;
-    bool m_isProcessing = true;
-    bool m_initialized = false;
-    bool m_validHeader = false;
-    bool m_tracing = false;
-    bool m_verbosity = false;
-    unsigned long m_contentLength = 0;
-    std::regex m_headerRegex {"([\\w-]+): (.+)\\r\\n(?:([^:]+)\\r\\n)?"};
+    virtual void WriteTrace(const std::string& message, const std::string& verbose) = 0;
+    virtual void WriteError(JRPCErrorCode errorCode, const std::string& message) const = 0;
 };
+
+std::shared_ptr<IJsonRPC> CreateJsonRPC();
 
 } // namespace ocls
