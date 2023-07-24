@@ -32,9 +32,9 @@ class LSPServer final
     , public std::enable_shared_from_this<LSPServer>
 {
 public:
-    LSPServer() 
-        : m_jrpc(CreateJsonRPC())
-        , m_diagnostics(CreateDiagnostics(CreateCLInfo())) {}
+    LSPServer(std::shared_ptr<IJsonRPC> jrpc, std::shared_ptr<IDiagnostics> diagnostics) 
+        : m_jrpc { std::move(jrpc) }
+        , m_diagnostics { std::move(diagnostics) } {}
 
     int Run();
     void Interrupt();
@@ -322,9 +322,9 @@ void LSPServer::Interrupt()
     m_interrupted.store(true);
 }
 
-std::shared_ptr<ILSPServer> CreateLSPServer()
+std::shared_ptr<ILSPServer> CreateLSPServer(std::shared_ptr<IJsonRPC> jrpc, std::shared_ptr<IDiagnostics> diagnostics)
 {
-    return std::shared_ptr<ILSPServer>(new LSPServer());
+    return std::shared_ptr<ILSPServer>(new LSPServer(std::move(jrpc), std::move(diagnostics)));
 }
 
 } // namespace ocls

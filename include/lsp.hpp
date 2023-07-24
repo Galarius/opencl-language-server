@@ -9,6 +9,9 @@
 
 #include <memory>
 
+#include "diagnostics.hpp"
+#include "jsonrpc.hpp"
+
 namespace ocls {
 
 struct ILSPServer
@@ -17,6 +20,6 @@ struct ILSPServer
     virtual void Interrupt() = 0;
 };
 
-std::shared_ptr<ILSPServer> CreateLSPServer();
+std::shared_ptr<ILSPServer> CreateLSPServer(std::shared_ptr<IJsonRPC> jrpc, std::shared_ptr<IDiagnostics> diagnostics);
 
 } // namespace ocls

@@ -8,6 +8,8 @@
 #include <iostream>
 
 #include "clinfo.hpp"
+#include "diagnostics.hpp"
+#include "jsonrpc.hpp"
 #include "lsp.hpp"
 #include "version.hpp"
 
@@ -119,9 +121,9 @@ int main(int argc, char* argv[])
 
     ConfigureLogging(flagLogTofile, optLogFile, optLogLevel);
 
+    auto clinfo = CreateCLInfo();
     if (flagCLInfo)
     {
-        const auto clinfo = CreateCLInfo();
         const auto jsonBody = clinfo->json();
         std::cout << jsonBody.dump() << std::endl;
         exit(0);
@@ -131,6 +133,8 @@ int main(int argc, char* argv[])
 
     std::signal(SIGINT, SignalHandler);
 
-    server = CreateLSPServer();
+    auto jrpc = CreateJsonRPC();
+    auto diagnostics = CreateDiagnostics(clinfo);
+    server = CreateLSPServer(jrpc, diagnostics);
     return server->Run();
 }
