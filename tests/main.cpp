@@ -33,10 +33,12 @@ std::string BuildRequest(const json& obj)
     return BuildRequest(obj.dump());
 }
 
-void Send(const std::string& request, JsonRPC& jrpc)
+void Send(const std::string& request, std::shared_ptr<IJsonRPC> jrpc)
 {
     for (auto c : request)
-        jrpc.Consume(c);
+    {
+        jrpc->Consume(c);
+    }
 }
 
 std::string ParseResponse(std::string str)
@@ -53,51 +55,51 @@ std::string ParseResponse(std::string str)
 const std::string initRequest = BuildRequest(json::object(
     {{"jsonrpc", "2.0"}, {"id", 0}, {"method", "initialize"}, {"params", {{"processId", 60650}, {"trace", "off"}}}}));
 
-const auto InitializeJsonRPC = [](JsonRPC& jrpc) {
-    jrpc.RegisterOutputCallback([](const std::string&) {});
-    jrpc.RegisterMethodCallback("initialize", [](const json&) {});
+const auto InitializeJsonRPC = [](std::shared_ptr<IJsonRPC> jrpc) {
+    jrpc->RegisterOutputCallback([](const std::string&) {});
+    jrpc->RegisterMethodCallback("initialize", [](const json&) {});
     Send(initRequest, jrpc);
-    jrpc.Reset();
+    jrpc->Reset();
 };
 
 } // namespace
 
 TEST(JsonRPCTest, InvalidRequestHandling)
 {
-    JsonRPC jrpc;
+    auto jrpc = CreateJsonRPC();
     json response;
     const std::string request = R"!({"jsonrpc: 2.0", "id":0, [method]: "initialize"})!";
     const std::string message = BuildRequest(request);
-    jrpc.RegisterOutputCallback(
+    jrpc->RegisterOutputCallback(
         [&response](const std::string& message) { response = json::parse(ParseResponse(message)); });
 
     Send(message, jrpc);
 
     const auto code = response["error"]["code"].get<int64_t>();
-    EXPECT_EQ(code, static_cast<int64_t>(JsonRPC::ErrorCode::ParseError));
+    EXPECT_EQ(code, static_cast<int64_t>(JRPCErrorCode::ParseError));
 }
 
 TEST(JsonRPCTest, OutOfOrderRequest)
 {
-    JsonRPC jrpc;
+    auto jrpc = CreateJsonRPC();
     json response;
     const std::string message =
         BuildRequest(json::object({{"jsonrpc", "2.0"}, {"id", 0}, {"method", "textDocument/didOpen"}, {"params", {}}}));
-    jrpc.RegisterOutputCallback(
+    jrpc->RegisterOutputCallback(
         [&response](const std::string& message) { response = json::parse(ParseResponse(message)); });
 
     Send(message, jrpc);
 
     const auto code = response["error"]["code"].get<int64_t>();
-    EXPECT_EQ(code, static_cast<int64_t>(JsonRPC::ErrorCode::NotInitialized));
+    EXPECT_EQ(code, static_cast<int64_t>(JRPCErrorCode::NotInitialized));
 }
 
 TEST(JsonRPCTest, MethodInitialize)
 {
-    JsonRPC jrpc;
+    auto jrpc = CreateJsonRPC();
     int64_t processId = 0;
-    jrpc.RegisterOutputCallback([](const std::string&) {});
-    jrpc.RegisterMethodCallback(
+    jrpc->RegisterOutputCallback([](const std::string&) {});
+    jrpc->RegisterMethodCallback(
         "initialize", [&processId](const json& request) { processId = request["params"]["processId"].get<int64_t>(); });
 
     Send(initRequest, jrpc);
@@ -107,29 +109,29 @@ TEST(JsonRPCTest, MethodInitialize)
 
 TEST(JsonRPCTest, RespondToUnsupportedMethod)
 {
-    JsonRPC jrpc;
+    auto jrpc = CreateJsonRPC();
     InitializeJsonRPC(jrpc);
     json response;
     const std::string request =
         BuildRequest(json::object({{"jsonrpc", "2.0"}, {"id", 0}, {"method", "textDocument/didOpen"}, {"params", {}}}));
-    jrpc.RegisterOutputCallback(
+    jrpc->RegisterOutputCallback(
         [&response](const std::string& message) { response = json::parse(ParseResponse(message)); });
 
     // send unsupported request
     Send(request, jrpc);
 
     const auto code = response["error"]["code"].get<int64_t>();
-    EXPECT_EQ(code, static_cast<int64_t>(JsonRPC::ErrorCode::MethodNotFound));
+    EXPECT_EQ(code, static_cast<int64_t>(JRPCErrorCode::MethodNotFound));
 }
 
 TEST(JsonRPCTest, RespondToSupportedMethod)
 {
-    JsonRPC jrpc;
+    auto jrpc = CreateJsonRPC();
     InitializeJsonRPC(jrpc);
     bool isCallbackCalled = false;
     const std::string request =
         BuildRequest(json::object({{"jsonrpc", "2.0"}, {"id", 0}, {"method", "textDocument/didOpen"}, {"params", {}}}));
-    jrpc.RegisterMethodCallback(
+    jrpc->RegisterMethodCallback(
         "textDocument/didOpen", [&isCallbackCalled]([[maybe_unused]] const json& request) { isCallbackCalled = true; });
 
     Send(request, jrpc);

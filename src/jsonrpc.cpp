@@ -6,7 +6,11 @@
 //
 
 #include "jsonrpc.hpp"
+
+#include <iostream>
+#include <regex>
 #include <spdlog/spdlog.h>
+#include <unordered_map>
 
 using namespace nlohmann;
 
@@ -23,6 +27,73 @@ inline std::string FormatBool(bool flag)
 }
 
 } // namespace
+
+class JsonRPC final : public IJsonRPC
+{
+public:
+    friend std::ostream& operator<<(std::ostream& out, JRPCErrorCode const& code)
+    {
+        out << static_cast<int64_t>(code);
+        return out;
+    }
+
+    /**
+     Register callback to be notified on the specific method notification.
+     All unregistered notifications will be responded with MethodNotFound automatically.
+     */
+    void RegisterMethodCallback(const std::string& method, InputCallbackFunc&& func);
+    /**
+     Register callback to be notified on client responds to server (our) requests.
+     */
+    void RegisterInputCallback(InputCallbackFunc&& func);
+    /**
+     Register callback to be notified when server is going to send the final message to the client.
+     Basically it should be redirected to the stdout.
+     */
+    void RegisterOutputCallback(OutputCallbackFunc&& func);
+
+    void Consume(char c);
+    bool IsReady() const;
+    void Write(const nlohmann::json& data) const;
+    void Reset();
+    /**
+     Send trace message to client.
+     */
+    void WriteTrace(const std::string& message, const std::string& verbose);
+    void WriteError(JRPCErrorCode errorCode, const std::string& message) const;
+
+private:
+    void ProcessBufferContent();
+    void ProcessMethod();
+    void ProcessBufferHeader();
+
+    void OnInitialize();
+    void OnTracingChanged(const nlohmann::json& data);
+    bool ReadHeader();
+    void FireMethodCallback();
+    void FireRespondCallback();
+
+    void LogBufferContent() const;
+    void LogMessage(const std::string& message) const;
+    void LogAndHandleParseError(std::exception& e);
+    void LogAndHandleUnexpectedMessage();
+
+private:
+    std::string m_method;
+    std::string m_buffer;
+    nlohmann::json m_body;
+    std::unordered_map<std::string, std::string> m_headers;
+    std::unordered_map<std::string, InputCallbackFunc> m_callbacks;
+    OutputCallbackFunc m_outputCallback;
+    InputCallbackFunc m_respondCallback;
+    bool m_isProcessing = true;
+    bool m_initialized = false;
+    bool m_validHeader = false;
+    bool m_tracing = false;
+    bool m_verbosity = false;
+    unsigned long m_contentLength = 0;
+    std::regex m_headerRegex {"([\\w-]+): (.+)\\r\\n(?:([^:]+)\\r\\n)?"};
+};
 
 void JsonRPC::RegisterMethodCallback(const std::string& method, InputCallbackFunc&& func)
 {
@@ -189,7 +260,7 @@ void JsonRPC::ProcessBufferHeader()
         }
         else
         {
-            WriteError(ErrorCode::InvalidRequest, "Invalid content length");
+            WriteError(JRPCErrorCode::InvalidRequest, "Invalid content length");
         }
     }
 }
@@ -268,7 +339,7 @@ void JsonRPC::FireMethodCallback()
             "Got request: {}, respond is required: {}", FormatBool(isRequest), FormatBool(mustRespond));
         if (mustRespond)
         {
-            WriteError(ErrorCode::MethodNotFound, "Method '" + m_method + "' is not supported.");
+            WriteError(JRPCErrorCode::MethodNotFound, "Method '" + m_method + "' is not supported.");
         }
     }
     else
@@ -285,7 +356,7 @@ void JsonRPC::FireMethodCallback()
     }
 }
 
-void JsonRPC::WriteError(JsonRPC::ErrorCode errorCode, const std::string& message) const
+void JsonRPC::WriteError(JRPCErrorCode errorCode, const std::string& message) const
 {
     spdlog::get(logger)->trace("Reporting error: '{}' ({})", message, static_cast<int>(errorCode));
     json obj = {
@@ -333,13 +404,18 @@ void JsonRPC::LogAndHandleParseError(std::exception& e)
 {
     spdlog::get(logger)->error("Failed to parse request with reason: '{}'\n{}", e.what(), "\n", m_buffer);
     m_buffer.clear();
-    WriteError(ErrorCode::ParseError, "Failed to parse request");
+    WriteError(JRPCErrorCode::ParseError, "Failed to parse request");
 }
 
 void JsonRPC::LogAndHandleUnexpectedMessage()
 {
     spdlog::get(logger)->error("Unexpected first message: '{}'", m_method);
-    WriteError(ErrorCode::NotInitialized, "Server was not initialized.");
+    WriteError(JRPCErrorCode::NotInitialized, "Server was not initialized.");
+}
+
+std::shared_ptr<IJsonRPC> CreateJsonRPC()
+{
+    return std::shared_ptr<IJsonRPC>(new JsonRPC());
 }
 
 } // namespace ocls

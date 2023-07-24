@@ -11,8 +11,8 @@
 #include "utils.hpp"
 
 #include <atomic>
+#include <iostream>
 #include <spdlog/spdlog.h>
-
 #include <queue>
 
 using namespace nlohmann;
@@ -32,7 +32,9 @@ class LSPServer final
     , public std::enable_shared_from_this<LSPServer>
 {
 public:
-    LSPServer() : m_diagnostics(CreateDiagnostics(CreateCLInfo())) {}
+    LSPServer() 
+        : m_jrpc(CreateJsonRPC())
+        , m_diagnostics(CreateDiagnostics(CreateCLInfo())) {}
 
     int Run();
     void Interrupt();
@@ -50,7 +52,7 @@ private:
     void OnExit();
 
 private:
-    JsonRPC m_jrpc;
+    std::shared_ptr<IJsonRPC> m_jrpc;
     std::shared_ptr<IDiagnostics> m_diagnostics;
     std::queue<json> m_outQueue;
     Capabilities m_capabilities;
@@ -159,7 +161,7 @@ void LSPServer::BuildDiagnosticsRespond(const std::string &uri, const std::strin
     {
         auto msg = std::string("Failed to get diagnostics: ") + err.what();
         spdlog::get(logger)->error(msg);
-        m_jrpc.WriteError(JsonRPC::ErrorCode::InternalError, msg);
+        m_jrpc->WriteError(JRPCErrorCode::InternalError, msg);
     }
 }
 
@@ -248,41 +250,41 @@ int LSPServer::Run()
     auto self = this->shared_from_this();
     // clang-format off
     // Register handlers for methods
-    m_jrpc.RegisterMethodCallback("initialize", [self](const json &request)
+    m_jrpc->RegisterMethodCallback("initialize", [self](const json &request)
     {
         self->OnInitialize(request);
     });
-    m_jrpc.RegisterMethodCallback("initialized", [self](const json &request)
+    m_jrpc->RegisterMethodCallback("initialized", [self](const json &request)
     {
         self->OnInitialized(request);
     });
-    m_jrpc.RegisterMethodCallback("shutdown", [self](const json &request)
+    m_jrpc->RegisterMethodCallback("shutdown", [self](const json &request)
     {
         self->OnShutdown(request);
     });
-    m_jrpc.RegisterMethodCallback("exit", [self](const json &)
+    m_jrpc->RegisterMethodCallback("exit", [self](const json &)
     {
         self->OnExit();
     });
-    m_jrpc.RegisterMethodCallback("textDocument/didOpen", [self](const json &request)
+    m_jrpc->RegisterMethodCallback("textDocument/didOpen", [self](const json &request)
     {
         self->OnTextOpen(request);
     });
-    m_jrpc.RegisterMethodCallback("textDocument/didChange", [self](const json &request)
+    m_jrpc->RegisterMethodCallback("textDocument/didChange", [self](const json &request)
     {
         self->OnTextChanged(request);
     });
-    m_jrpc.RegisterMethodCallback("workspace/didChangeConfiguration", [self](const json &)
+    m_jrpc->RegisterMethodCallback("workspace/didChangeConfiguration", [self](const json &)
     {
         self->GetConfiguration();
     });
     // Register handler for client responds
-    m_jrpc.RegisterInputCallback([self](const json &respond)
+    m_jrpc->RegisterInputCallback([self](const json &respond)
     {
         self->OnRespond(respond);
     });
     // Register handler for message delivery
-    m_jrpc.RegisterOutputCallback([](const std::string &message)
+    m_jrpc->RegisterOutputCallback([](const std::string &message)
     {
         #if defined(WIN32)
             printf_s("%s", message.c_str());
@@ -300,14 +302,14 @@ int LSPServer::Run()
         if(m_interrupted.load()) {
             return EINTR;
         }
-        m_jrpc.Consume(c);
-        if (m_jrpc.IsReady())
+        m_jrpc->Consume(c);
+        if (m_jrpc->IsReady())
         {
-            m_jrpc.Reset();
+            m_jrpc->Reset();
             while (!m_outQueue.empty())
             {
                 auto data = m_outQueue.front();
-                m_jrpc.Write(data);
+                m_jrpc->Write(data);
                 m_outQueue.pop();
             }
         }
