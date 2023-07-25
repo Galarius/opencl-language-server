@@ -2,7 +2,7 @@
 //  lsp.cpp
 //  opencl-language-server
 //
-//  Created by Ilya Shoshin (Galarius) on 7/16/21.
+//  Created by Ilia Shoshin on 7/16/21.
 //
 
 #include "lsp.hpp"
@@ -32,9 +32,10 @@ class LSPServer final
     , public std::enable_shared_from_this<LSPServer>
 {
 public:
-    LSPServer(std::shared_ptr<IJsonRPC> jrpc, std::shared_ptr<IDiagnostics> diagnostics) 
-        : m_jrpc { std::move(jrpc) }
-        , m_diagnostics { std::move(diagnostics) } {}
+    LSPServer(std::shared_ptr<IJsonRPC> jrpc, std::shared_ptr<ILSPServerEventsHandler> handler)
+        : m_jrpc {std::move(jrpc)}
+        , m_handler {std::move(handler)}
+    {}
 
     int Run();
     void Interrupt();
@@ -53,21 +54,49 @@ private:
 
 private:
     std::shared_ptr<IJsonRPC> m_jrpc;
+    std::shared_ptr<ILSPServerEventsHandler> m_handler;
+    std::atomic<bool> m_interrupted = {false};
+};
+
+class LSPServerEventsHandler final : public ILSPServerEventsHandler
+{
+public:
+    LSPServerEventsHandler(std::shared_ptr<IJsonRPC> jrpc, std::shared_ptr<IDiagnostics> diagnostics)
+        : m_jrpc {std::move(jrpc)}
+        , m_diagnostics {std::move(diagnostics)}
+    {}
+
+    void BuildDiagnosticsRespond(const std::string &uri, const std::string &content);
+    void GetConfiguration();
+    std::optional<json> GetNextResponse();
+    void OnInitialize(const json &data);
+    void OnInitialized(const json &data);
+    void OnTextOpen(const json &data);
+    void OnTextChanged(const json &data);
+    void OnConfiguration(const json &data);
+    void OnRespond(const json &data);
+    void OnShutdown(const json &data);
+    void OnExit();
+
+private:
+    std::shared_ptr<IJsonRPC> m_jrpc;
     std::shared_ptr<IDiagnostics> m_diagnostics;
     std::queue<json> m_outQueue;
     Capabilities m_capabilities;
     std::queue<std::pair<std::string, std::string>> m_requests;
     bool m_shutdown = false;
-    std::atomic<bool> m_interrupted = {false};
 };
 
-void LSPServer::GetConfiguration()
+// ILSPServerEventsHandler
+
+void LSPServerEventsHandler::GetConfiguration()
 {
     if (!m_capabilities.hasConfigurationCapability)
     {
         spdlog::get(logger)->debug("Does not have configuration capability");
         return;
     }
+
     spdlog::get(logger)->debug("Make configuration request");
     json buildOptions = {{"section", "OpenCL.server.buildOptions"}};
     json maxNumberOfProblems = {{"section", "OpenCL.server.maxNumberOfProblems"}};
@@ -80,8 +109,19 @@ void LSPServer::GetConfiguration()
          {"params", {{"items", json::array({buildOptions, maxNumberOfProblems, openCLDeviceID})}}}});
 }
 
+std::optional<json> LSPServerEventsHandler::GetNextResponse()
+{
+    if (m_outQueue.empty())
+    {
+        return std::nullopt;
+    }
 
-void LSPServer::OnInitialize(const json &data)
+    auto data = m_outQueue.front();
+    m_outQueue.pop();
+    return data;
+}
+
+void LSPServerEventsHandler::OnInitialize(const json &data)
 {
     spdlog::get(logger)->debug("Received 'initialize' request");
     try
@@ -101,7 +141,7 @@ void LSPServer::OnInitialize(const json &data)
         auto deviceID = configuration["deviceID"].get<int64_t>();
         m_diagnostics->SetOpenCLDevice(static_cast<uint32_t>(deviceID));
     }
-    catch (std::exception &err)
+    catch (nlohmann::json::out_of_range &err)
     {
         spdlog::get(logger)->error("Failed to parse initialize parameters, {}", err.what());
     }
@@ -120,7 +160,7 @@ void LSPServer::OnInitialize(const json &data)
     m_outQueue.push({{"id", data["id"]}, {"result", {{"capabilities", capabilities}}}});
 }
 
-void LSPServer::OnInitialized(const json &)
+void LSPServerEventsHandler::OnInitialized(const json &)
 {
     spdlog::get(logger)->debug("Received 'initialized' message");
     if (!m_capabilities.supportDidChangeConfiguration)
@@ -141,7 +181,7 @@ void LSPServer::OnInitialized(const json &)
     m_outQueue.push({{"id", utils::GenerateId()}, {"method", "client/registerCapability"}, {"params", params}});
 }
 
-void LSPServer::BuildDiagnosticsRespond(const std::string &uri, const std::string &content)
+void LSPServerEventsHandler::BuildDiagnosticsRespond(const std::string &uri, const std::string &content)
 {
     try
     {
@@ -165,7 +205,7 @@ void LSPServer::BuildDiagnosticsRespond(const std::string &uri, const std::strin
     }
 }
 
-void LSPServer::OnTextOpen(const json &data)
+void LSPServerEventsHandler::OnTextOpen(const json &data)
 {
     spdlog::get(logger)->debug("Received 'textOpen' message");
     std::string srcUri = data["params"]["textDocument"]["uri"].get<std::string>();
@@ -173,7 +213,7 @@ void LSPServer::OnTextOpen(const json &data)
     BuildDiagnosticsRespond(srcUri, content);
 }
 
-void LSPServer::OnTextChanged(const json &data)
+void LSPServerEventsHandler::OnTextChanged(const json &data)
 {
     spdlog::get(logger)->debug("Received 'textChanged' message");
     std::string srcUri = data["params"]["textDocument"]["uri"].get<std::string>();
@@ -182,7 +222,7 @@ void LSPServer::OnTextChanged(const json &data)
     BuildDiagnosticsRespond(srcUri, content);
 }
 
-void LSPServer::OnConfiguration(const json &data)
+void LSPServerEventsHandler::OnConfiguration(const json &data)
 {
     spdlog::get(logger)->debug("Received 'configuration' respond");
     auto result = data["result"];
@@ -215,7 +255,7 @@ void LSPServer::OnConfiguration(const json &data)
     }
 }
 
-void LSPServer::OnRespond(const json &data)
+void LSPServerEventsHandler::OnRespond(const json &data)
 {
     spdlog::get(logger)->debug("Received client respond");
     const auto id = data["id"];
@@ -228,14 +268,14 @@ void LSPServer::OnRespond(const json &data)
     }
 }
 
-void LSPServer::OnShutdown(const json &data)
+void LSPServerEventsHandler::OnShutdown(const json &data)
 {
     spdlog::get(logger)->debug("Received 'shutdown' request");
     m_outQueue.push({{"id", data["id"]}, {"result", nullptr}});
     m_shutdown = true;
 }
 
-void LSPServer::OnExit()
+void LSPServerEventsHandler::OnExit()
 {
     spdlog::get(logger)->debug("Received 'exit', after 'shutdown': {}", m_shutdown ? "yes" : "no");
     if (m_shutdown)
@@ -243,6 +283,8 @@ void LSPServer::OnExit()
     else
         exit(EXIT_FAILURE);
 }
+
+// ILSPServer
 
 int LSPServer::Run()
 {
@@ -252,36 +294,36 @@ int LSPServer::Run()
     // Register handlers for methods
     m_jrpc->RegisterMethodCallback("initialize", [self](const json &request)
     {
-        self->OnInitialize(request);
+        self->m_handler->OnInitialize(request);
     });
     m_jrpc->RegisterMethodCallback("initialized", [self](const json &request)
     {
-        self->OnInitialized(request);
+        self->m_handler->OnInitialized(request);
     });
     m_jrpc->RegisterMethodCallback("shutdown", [self](const json &request)
     {
-        self->OnShutdown(request);
+        self->m_handler->OnShutdown(request);
     });
     m_jrpc->RegisterMethodCallback("exit", [self](const json &)
     {
-        self->OnExit();
+        self->m_handler->OnExit();
     });
     m_jrpc->RegisterMethodCallback("textDocument/didOpen", [self](const json &request)
     {
-        self->OnTextOpen(request);
+        self->m_handler->OnTextOpen(request);
     });
     m_jrpc->RegisterMethodCallback("textDocument/didChange", [self](const json &request)
     {
-        self->OnTextChanged(request);
+        self->m_handler->OnTextChanged(request);
     });
     m_jrpc->RegisterMethodCallback("workspace/didChangeConfiguration", [self](const json &)
     {
-        self->GetConfiguration();
+        self->m_handler->GetConfiguration();
     });
     // Register handler for client responds
     m_jrpc->RegisterInputCallback([self](const json &respond)
     {
-        self->OnRespond(respond);
+        self->m_handler->OnRespond(respond);
     });
     // Register handler for message delivery
     m_jrpc->RegisterOutputCallback([](const std::string &message)
@@ -294,37 +336,55 @@ int LSPServer::Run()
         #endif    
     });
     // clang-format on
-    
+
     spdlog::get(logger)->info("Listening...");
     char c;
     while (std::cin.get(c))
     {
-        if(m_interrupted.load()) {
+        if (m_interrupted.load())
+        {
             return EINTR;
         }
         m_jrpc->Consume(c);
         if (m_jrpc->IsReady())
         {
             m_jrpc->Reset();
-            while (!m_outQueue.empty())
+            while (true)
             {
-                auto data = m_outQueue.front();
-                m_jrpc->Write(data);
-                m_outQueue.pop();
+                auto data = m_handler->GetNextResponse();
+                if (!data.has_value())
+                {
+                    break;
+                }
+                m_jrpc->Write(*data);
             }
         }
     }
     return 0;
 }
 
-void LSPServer::Interrupt() 
+void LSPServer::Interrupt()
 {
     m_interrupted.store(true);
 }
 
-std::shared_ptr<ILSPServer> CreateLSPServer(std::shared_ptr<IJsonRPC> jrpc, std::shared_ptr<IDiagnostics> diagnostics)
+std::shared_ptr<ILSPServerEventsHandler> CreateLSPEventsHandler(
+    std::shared_ptr<IJsonRPC> jrpc, std::shared_ptr<IDiagnostics> diagnostics)
 {
-    return std::shared_ptr<ILSPServer>(new LSPServer(std::move(jrpc), std::move(diagnostics)));
+    return std::make_shared<LSPServerEventsHandler>(jrpc, diagnostics);
+}
+
+std::shared_ptr<ILSPServer> CreateLSPServer(
+    std::shared_ptr<IJsonRPC> jrpc, std::shared_ptr<ILSPServerEventsHandler> handler)
+{
+    return std::make_shared<LSPServer>(std::move(jrpc), std::move(handler));
+}
+
+std::shared_ptr<ILSPServer> CreateLSPServer(
+    std::shared_ptr<IJsonRPC> jrpc, std::shared_ptr<IDiagnostics> diagnostics) 
+{
+    auto handler = std::make_shared<LSPServerEventsHandler>(jrpc, diagnostics);
+    return std::make_shared<LSPServer>(std::move(jrpc), std::move(handler));
 }
 
 } // namespace ocls

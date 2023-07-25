@@ -34,6 +34,8 @@ enum class JRPCErrorCode : int
 
 struct IJsonRPC
 {
+    virtual ~IJsonRPC() = default;
+
     /**
      Register callback to be notified on the specific method notification.
      All unregistered notifications will be responded with MethodNotFound automatically.
