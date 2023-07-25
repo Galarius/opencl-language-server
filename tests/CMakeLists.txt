@@ -1,9 +1,14 @@
 set(TESTS_PROJECT_NAME ${PROJECT_NAME}-tests)
 set(headers
-    "${PROJECT_SOURCE_DIR}/include/jsonrpc.hpp"
+    jsonrpc.hpp
 )
 set(sources
-    "${PROJECT_SOURCE_DIR}/src/jsonrpc.cpp"
+    jsonrpc.cpp
+)
+list(TRANSFORM headers PREPEND "${PROJECT_SOURCE_DIR}/include/")
+list(TRANSFORM sources PREPEND "${PROJECT_SOURCE_DIR}/src/")
+set(test_sources
+    jsonrpc-tests.cpp
     main.cpp
 )
 set(libs GTest::gtest nlohmann_json::nlohmann_json spdlog::spdlog OpenCL::HeadersCpp)
@@ -15,7 +20,7 @@ elseif(WIN32)
     set(libs ${libs} OpenCL::OpenCL)
 endif()
 
-add_executable (${TESTS_PROJECT_NAME} ${headers} ${sources})
+add_executable (${TESTS_PROJECT_NAME} ${headers} ${sources} ${test_sources})
 target_include_directories(${TESTS_PROJECT_NAME} PRIVATE 
     "${PROJECT_SOURCE_DIR}/include"
 )
