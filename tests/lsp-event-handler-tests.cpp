@@ -35,7 +35,7 @@ protected:
 } // namespace
 
 
-TEST_F(LSPTest, OnInitialize)
+TEST_F(LSPTest, OnInitialize_shouldBuildResponse_andCallDiagnosticsSetters)
 {
     nlohmann::json testData = R"({
         "params": {
@@ -56,6 +56,21 @@ TEST_F(LSPTest, OnInitialize)
         "id": 1
     })"_json;
 
+    nlohmann::json expectedResponse = R"({
+        "id": 1,
+        "result": {
+            "capabilities": {
+                "textDocumentSync": {
+                    "openClose": true,
+                    "change": 1,
+                    "willSave": false,
+                    "willSaveWaitUntil": false,
+                    "save": false
+                }
+            }
+        }
+    })"_json;
+
     EXPECT_CALL(
         *mockDiagnostics, SetBuildOptions(testData["params"]["initializationOptions"]["configuration"]["buildOptions"]))
         .Times(1);
@@ -63,4 +78,49 @@ TEST_F(LSPTest, OnInitialize)
     EXPECT_CALL(*mockDiagnostics, SetOpenCLDevice(1)).Times(1);
 
     handler->OnInitialize(testData);
+    auto response = handler->GetNextResponse();
+
+    EXPECT_TRUE(response.has_value());
+    EXPECT_EQ(*response, expectedResponse);
+}
+
+TEST_F(LSPTest, OnInitialize_withMissingConfigurationFields_shouldBuildResponse_andNotCallDiagnosticsSetters)
+{
+    nlohmann::json testData = R"({
+        "params": {
+            "capabilities": {
+                "workspace": {
+                    "configuration": true,
+                    "didChangeConfiguration": {"dynamicRegistration": true}
+                }
+            },
+            "initializationOptions": {
+                "configuration": {
+
+                }
+            }
+        },
+        "id": 1
+    })"_json;
+
+    nlohmann::json expectedResponse = R"({
+        "id": 1,
+        "result": {
+            "capabilities": {
+                "textDocumentSync": {
+                    "openClose": true,
+                    "change": 1,
+                    "willSave": false,
+                    "willSaveWaitUntil": false,
+                    "save": false
+                }
+            }
+        }
+    })"_json;
+
+    handler->OnInitialize(testData);
+    auto response = handler->GetNextResponse();
+
+    EXPECT_TRUE(response.has_value());
+    EXPECT_EQ(*response, expectedResponse);
 }

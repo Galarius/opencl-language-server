@@ -63,7 +63,7 @@ public:
     explicit Diagnostics(std::shared_ptr<ICLInfo> clInfo);
 
     void SetBuildOptions(const nlohmann::json& options);
-    void SetMaxProblemsCount(int maxNumberOfProblems);
+    void SetMaxProblemsCount(uint64_t maxNumberOfProblems);
     void SetOpenCLDevice(uint32_t identifier);
     nlohmann::json Get(const Source& source);
 
@@ -76,7 +76,7 @@ private:
     std::optional<cl::Device> m_device;
     std::regex m_regex {"^(.*):(\\d+):(\\d+): ((fatal )?error|warning|Scholar): (.*)$"};
     std::string m_BuildOptions;
-    int m_maxNumberOfProblems = 100;
+    uint64_t m_maxNumberOfProblems = INT8_MAX;
 };
 
 Diagnostics::Diagnostics(std::shared_ptr<ICLInfo> clInfo) : m_clInfo {std::move(clInfo)}
@@ -201,7 +201,7 @@ nlohmann::json Diagnostics::BuildDiagnostics(const std::string& buildLog, const 
     std::smatch matches;
     auto errorLines = utils::SplitString(buildLog, "\n");
     json diagnostics;
-    int count = 0;
+    uint64_t count = 0;
     for (auto errLine : errorLines)
     {
         std::regex_search(errLine, matches, m_regex);
@@ -279,7 +279,7 @@ void Diagnostics::SetBuildOptions(const json& options)
     }
 }
 
-void Diagnostics::SetMaxProblemsCount(int maxNumberOfProblems)
+void Diagnostics::SetMaxProblemsCount(uint64_t maxNumberOfProblems)
 {
     spdlog::get(logger)->trace("Set max number of problems: {}", maxNumberOfProblems);
     m_maxNumberOfProblems = maxNumberOfProblems;

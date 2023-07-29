@@ -26,7 +26,7 @@ struct IDiagnostics
     virtual ~IDiagnostics() = default;
     
     virtual void SetBuildOptions(const nlohmann::json& options) = 0;
-    virtual void SetMaxProblemsCount(int maxNumberOfProblems) = 0;
+    virtual void SetMaxProblemsCount(uint64_t maxNumberOfProblems) = 0;
     virtual void SetOpenCLDevice(uint32_t identifier) = 0;
     virtual nlohmann::json Get(const Source& source) = 0;
 };

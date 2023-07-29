@@ -22,7 +22,7 @@ You can configure diagnostics with `json-rpc` request during the intitialization
             "configuration": {
                 "buildOptions": [],
                 "deviceID": 0,
-                "maxNumberOfProblems": 100
+                "maxNumberOfProblems": 127
             }
         }
     }

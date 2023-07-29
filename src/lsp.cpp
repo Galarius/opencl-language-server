@@ -17,6 +17,24 @@
 
 using namespace nlohmann;
 
+namespace {
+
+std::optional<nlohmann::json> GetNestedValue(const nlohmann::json &j, const std::vector<std::string> &keys)
+{
+    const nlohmann::json *current = &j;
+    for (const auto &key : keys)
+    {
+        if (!current->contains(key))
+        {
+            return std::nullopt;
+        }
+        current = &(*current)[key];
+    }
+    return *current;
+}
+
+} // namespace
+
 namespace ocls {
 
 constexpr char logger[] = "lsp";
@@ -124,26 +142,38 @@ std::optional<json> LSPServerEventsHandler::GetNextResponse()
 void LSPServerEventsHandler::OnInitialize(const json &data)
 {
     spdlog::get(logger)->debug("Received 'initialize' request");
-    try
+
+    auto configurationCapability = GetNestedValue(data, {"params", "capabilities", "workspace", "configuration"});
+    if (configurationCapability)
     {
-        m_capabilities.hasConfigurationCapability =
-            data["params"]["capabilities"]["workspace"]["configuration"].get<bool>();
-        m_capabilities.supportDidChangeConfiguration =
-            data["params"]["capabilities"]["workspace"]["didChangeConfiguration"]["dynamicRegistration"].get<bool>();
-        auto configuration = data["params"]["initializationOptions"]["configuration"];
-
-        auto buildOptions = configuration["buildOptions"];
-        m_diagnostics->SetBuildOptions(buildOptions);
-
-        auto maxNumberOfProblems = configuration["maxNumberOfProblems"].get<int64_t>();
-        m_diagnostics->SetMaxProblemsCount(static_cast<int>(maxNumberOfProblems));
-
-        auto deviceID = configuration["deviceID"].get<int64_t>();
-        m_diagnostics->SetOpenCLDevice(static_cast<uint32_t>(deviceID));
+        m_capabilities.hasConfigurationCapability = configurationCapability->get<bool>();
     }
-    catch (nlohmann::json::out_of_range &err)
+
+    auto didChangeConfiguration =
+        GetNestedValue(data, {"params", "capabilities", "workspace", "didChangeConfiguration", "dynamicRegistration"});
+    if (didChangeConfiguration)
     {
-        spdlog::get(logger)->error("Failed to parse initialize parameters, {}", err.what());
+        m_capabilities.supportDidChangeConfiguration = didChangeConfiguration->get<bool>();
+    }
+
+    auto configuration = GetNestedValue(data, {"params", "initializationOptions", "configuration"});
+    if (configuration)
+    {
+        auto buildOptions = GetNestedValue(*configuration, {"buildOptions"});
+        auto maxNumberOfProblems = GetNestedValue(*configuration, {"maxNumberOfProblems"});
+        auto deviceID = GetNestedValue(*configuration, {"deviceID"});
+        if (buildOptions)
+        {
+            m_diagnostics->SetBuildOptions(*buildOptions);
+        }
+        if (maxNumberOfProblems)
+        {
+            m_diagnostics->SetMaxProblemsCount(*maxNumberOfProblems);
+        }
+        if (deviceID)
+        {
+            m_diagnostics->SetOpenCLDevice(*deviceID);
+        }
     }
 
     json capabilities = {
@@ -380,8 +410,7 @@ std::shared_ptr<ILSPServer> CreateLSPServer(
     return std::make_shared<LSPServer>(std::move(jrpc), std::move(handler));
 }
 
-std::shared_ptr<ILSPServer> CreateLSPServer(
-    std::shared_ptr<IJsonRPC> jrpc, std::shared_ptr<IDiagnostics> diagnostics) 
+std::shared_ptr<ILSPServer> CreateLSPServer(std::shared_ptr<IJsonRPC> jrpc, std::shared_ptr<IDiagnostics> diagnostics)
 {
     auto handler = std::make_shared<LSPServerEventsHandler>(jrpc, diagnostics);
     return std::make_shared<LSPServer>(std::move(jrpc), std::move(handler));
