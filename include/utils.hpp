@@ -16,7 +16,15 @@
 
 namespace ocls::utils {
 
-std::string GenerateId();
+struct IGenerator
+{
+    virtual ~IGenerator() = default;
+
+    virtual std::string GenerateID() = 0;
+};
+
+std::shared_ptr<IGenerator> CreateDefaultGenerator();
+
 void Trim(std::string& s);
 std::vector<std::string> SplitString(const std::string& str, const std::string& pattern);
 std::string UriToPath(const std::string& uri);

@@ -12,6 +12,7 @@
 
 #include "diagnostics.hpp"
 #include "jsonrpc.hpp"
+#include "utils.hpp"
 
 namespace ocls {
 
@@ -41,7 +42,7 @@ struct ILSPServerEventsHandler
 };
 
 std::shared_ptr<ILSPServerEventsHandler> CreateLSPEventsHandler(
-    std::shared_ptr<IJsonRPC> jrpc, std::shared_ptr<IDiagnostics> diagnostics);
+    std::shared_ptr<IJsonRPC> jrpc, std::shared_ptr<IDiagnostics> diagnostics, std::shared_ptr<utils::IGenerator> generator);
 
 std::shared_ptr<ILSPServer> CreateLSPServer(
     std::shared_ptr<IJsonRPC> jrpc, std::shared_ptr<ILSPServerEventsHandler> handler);

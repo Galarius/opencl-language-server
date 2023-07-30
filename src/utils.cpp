@@ -9,6 +9,7 @@
 
 #include <algorithm>
 #include <functional>
+#include <iomanip>
 #include <random>
 #include <regex>
 #include <spdlog/spdlog.h>
@@ -16,22 +17,32 @@
 
 namespace ocls::utils {
 
-std::string GenerateId()
+class DefaultGenerator final : public IGenerator
 {
-    std::random_device rd;
-    std::mt19937 gen(rd());
-    std::uniform_int_distribution<> dis(0, 255);
-    std::string identifier;
-    std::stringstream hex;
-    for (auto i = 0; i < 16; ++i)
+public:
+    DefaultGenerator() : gen(rd()), dis(0, 255) {}
+
+    std::string GenerateID()
     {
-        const auto rc = dis(gen);
-        hex << std::hex << rc;
-        auto str = hex.str();
-        identifier.append(str.length() < 2 ? '0' + str : str);
-        hex.str(std::string());
+        std::stringstream hex;
+        hex << std::hex;
+        for (auto i = 0; i < 16; ++i)
+        {
+            hex << std::setw(2) << std::setfill('0') << dis(gen);
+        }
+        return hex.str();
     }
-    return identifier;
+
+private:
+    std::random_device rd;
+    std::mt19937 gen;
+    std::uniform_int_distribution<> dis;
+};
+
+
+std::shared_ptr<IGenerator> CreateDefaultGenerator()
+{
+    return std::make_shared<DefaultGenerator>();
 }
 
 void Trim(std::string& s)
