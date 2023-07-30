@@ -8,7 +8,6 @@
 #include "lsp.hpp"
 #include "diagnostics.hpp"
 #include "jsonrpc.hpp"
-#include "utils.hpp"
 
 #include <atomic>
 #include <iostream>
@@ -79,9 +78,13 @@ private:
 class LSPServerEventsHandler final : public ILSPServerEventsHandler
 {
 public:
-    LSPServerEventsHandler(std::shared_ptr<IJsonRPC> jrpc, std::shared_ptr<IDiagnostics> diagnostics)
+    LSPServerEventsHandler(
+        std::shared_ptr<IJsonRPC> jrpc,
+        std::shared_ptr<IDiagnostics> diagnostics,
+        std::shared_ptr<utils::IGenerator> generator)
         : m_jrpc {std::move(jrpc)}
         , m_diagnostics {std::move(diagnostics)}
+        , m_generator {std::move(generator)}
     {}
 
     void BuildDiagnosticsRespond(const std::string &uri, const std::string &content);
@@ -99,6 +102,7 @@ public:
 private:
     std::shared_ptr<IJsonRPC> m_jrpc;
     std::shared_ptr<IDiagnostics> m_diagnostics;
+    std::shared_ptr<utils::IGenerator> m_generator;
     std::queue<json> m_outQueue;
     Capabilities m_capabilities;
     std::queue<std::pair<std::string, std::string>> m_requests;
@@ -119,7 +123,7 @@ void LSPServerEventsHandler::GetConfiguration()
     json buildOptions = {{"section", "OpenCL.server.buildOptions"}};
     json maxNumberOfProblems = {{"section", "OpenCL.server.maxNumberOfProblems"}};
     json openCLDeviceID = {{"section", "OpenCL.server.deviceID"}};
-    const auto requestId = utils::GenerateId();
+    const auto requestId = m_generator->GenerateID();
     m_requests.push(std::make_pair("workspace/configuration", requestId));
     m_outQueue.push(
         {{"id", requestId},
@@ -142,6 +146,12 @@ std::optional<json> LSPServerEventsHandler::GetNextResponse()
 void LSPServerEventsHandler::OnInitialize(const json &data)
 {
     spdlog::get(logger)->debug("Received 'initialize' request");
+    if (!data.contains("id"))
+    {
+        spdlog::get(logger)->error("'initialize' message does not contain 'id'");
+        return;
+    }
+    auto requestId = data["id"];
 
     auto configurationCapability = GetNestedValue(data, {"params", "capabilities", "workspace", "configuration"});
     if (configurationCapability)
@@ -187,12 +197,20 @@ void LSPServerEventsHandler::OnInitialize(const json &data)
          }},
     };
 
-    m_outQueue.push({{"id", data["id"]}, {"result", {{"capabilities", capabilities}}}});
+    m_outQueue.push({{"id", requestId}, {"result", {{"capabilities", capabilities}}}});
 }
 
-void LSPServerEventsHandler::OnInitialized(const json &)
+void LSPServerEventsHandler::OnInitialized(const json &data)
 {
     spdlog::get(logger)->debug("Received 'initialized' message");
+    if (!data.contains("id"))
+    {
+        spdlog::get(logger)->error("'initialized' message does not contain 'id'");
+        return;
+    }
+
+    auto requestId = data["id"];
+
     if (!m_capabilities.supportDidChangeConfiguration)
     {
         spdlog::get(logger)->debug("Does not support didChangeConfiguration registration");
@@ -200,7 +218,7 @@ void LSPServerEventsHandler::OnInitialized(const json &)
     }
 
     json registrations = {{
-        {"id", utils::GenerateId()},
+        {"id", m_generator->GenerateID()},
         {"method", "workspace/didChangeConfiguration"},
     }};
 
@@ -208,7 +226,7 @@ void LSPServerEventsHandler::OnInitialized(const json &)
         {"registrations", registrations},
     };
 
-    m_outQueue.push({{"id", utils::GenerateId()}, {"method", "client/registerCapability"}, {"params", params}});
+    m_outQueue.push({{"id", requestId}, {"method", "client/registerCapability"}, {"params", params}});
 }
 
 void LSPServerEventsHandler::BuildDiagnosticsRespond(const std::string &uri, const std::string &content)
@@ -399,9 +417,11 @@ void LSPServer::Interrupt()
 }
 
 std::shared_ptr<ILSPServerEventsHandler> CreateLSPEventsHandler(
-    std::shared_ptr<IJsonRPC> jrpc, std::shared_ptr<IDiagnostics> diagnostics)
+    std::shared_ptr<IJsonRPC> jrpc,
+    std::shared_ptr<IDiagnostics> diagnostics,
+    std::shared_ptr<utils::IGenerator> generator)
 {
-    return std::make_shared<LSPServerEventsHandler>(jrpc, diagnostics);
+    return std::make_shared<LSPServerEventsHandler>(jrpc, diagnostics, generator);
 }
 
 std::shared_ptr<ILSPServer> CreateLSPServer(
@@ -412,7 +432,8 @@ std::shared_ptr<ILSPServer> CreateLSPServer(
 
 std::shared_ptr<ILSPServer> CreateLSPServer(std::shared_ptr<IJsonRPC> jrpc, std::shared_ptr<IDiagnostics> diagnostics)
 {
-    auto handler = std::make_shared<LSPServerEventsHandler>(jrpc, diagnostics);
+    auto generator = utils::CreateDefaultGenerator();
+    auto handler = std::make_shared<LSPServerEventsHandler>(jrpc, diagnostics, generator);
     return std::make_shared<LSPServer>(std::move(jrpc), std::move(handler));
 }
 
