@@ -19,12 +19,17 @@ struct Source
 {
     std::string filePath;
     std::string text;
+
+    bool operator==(const Source& other) const
+    {
+        return filePath == other.filePath && text == other.text;
+    }
 };
 
 struct IDiagnostics
 {
     virtual ~IDiagnostics() = default;
-    
+
     virtual void SetBuildOptions(const nlohmann::json& options) = 0;
     virtual void SetMaxProblemsCount(uint64_t maxNumberOfProblems) = 0;
     virtual void SetOpenCLDevice(uint32_t identifier) = 0;

@@ -201,3 +201,53 @@ TEST_F(LSPTest, OnInitialized_withoutDidChangeConfigurationSupport_shouldNotBuil
 
     EXPECT_FALSE(response.has_value());
 }
+
+// BuildDiagnosticsRespond
+
+TEST_F(LSPTest, BuildDiagnosticsRespond_shouldBuildResponse)
+{
+    std::string uri = "kernel.cl";
+    std::string content =
+        R"(__kernel void add(__global double* a, __global double* b, __global double* c, const unsigned int n) {
+        int id = get_global_id(0);
+        if (id < n) {
+            c[id] = a[id] + b[id];
+        }
+    })";
+    nlohmann::json expected_diagnostics;
+    nlohmann::json diagnostic = {
+        {"source", uri},
+        {"range",
+         {
+             {"start",
+              {
+                  {"line", 1},
+                  {"character", 1},
+              }},
+             {"end",
+              {
+                  {"line", 1},
+                  {"character", 2},
+              }},
+             {"severity", 2},
+             {"message", "message"},
+         }}};
+    expected_diagnostics.emplace_back(diagnostic);
+    Source expectedSource {uri, content};
+    nlohmann::json expectedResponse = {
+        {"method", "textDocument/publishDiagnostics"},
+        {"params",
+         {
+             {"uri", uri},
+             {"diagnostics", expected_diagnostics},
+         }}};
+
+    ON_CALL(*mockDiagnostics, Get(testing::_)).WillByDefault(::testing::Return(expected_diagnostics));
+    EXPECT_CALL(*mockDiagnostics, Get(expectedSource)).Times(1);
+
+    handler->BuildDiagnosticsRespond(uri, content);
+    auto response = handler->GetNextResponse();
+
+    EXPECT_TRUE(response.has_value());
+    EXPECT_EQ(*response, expectedResponse);
+}
