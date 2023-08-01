@@ -251,3 +251,16 @@ TEST_F(LSPTest, BuildDiagnosticsRespond_shouldBuildResponse)
     EXPECT_TRUE(response.has_value());
     EXPECT_EQ(*response, expectedResponse);
 }
+
+TEST_F(LSPTest, BuildDiagnosticsRespond_withException_shouldReplyWithError)
+{
+    std::string uri = "kernel.cl";
+    std::string content = "__kernel void add() {}";
+    Source expectedSource {uri, content};
+    
+    ON_CALL(*mockDiagnostics, Get(testing::_)).WillByDefault(::testing::Throw(std::runtime_error("Exception")));
+    EXPECT_CALL(*mockDiagnostics, Get(expectedSource)).Times(1);
+    EXPECT_CALL(*mockJsonRPC, WriteError(JRPCErrorCode::InternalError, "Failed to get diagnostics: Exception")).Times(1);
+
+    handler->BuildDiagnosticsRespond(uri, content);
+}
