@@ -256,18 +256,28 @@ void LSPServerEventsHandler::BuildDiagnosticsRespond(const std::string &uri, con
 void LSPServerEventsHandler::OnTextOpen(const json &data)
 {
     spdlog::get(logger)->debug("Received 'textOpen' message");
-    std::string srcUri = data["params"]["textDocument"]["uri"].get<std::string>();
-    std::string content = data["params"]["textDocument"]["text"].get<std::string>();
-    BuildDiagnosticsRespond(srcUri, content);
+    auto uri = GetNestedValue(data, {"params", "textDocument", "uri"});
+    auto content = GetNestedValue(data, {"params", "textDocument", "text"});
+    if (uri && content) {
+        BuildDiagnosticsRespond(uri->get<std::string>(), content->get<std::string>());
+    }
+    
 }
 
 void LSPServerEventsHandler::OnTextChanged(const json &data)
 {
     spdlog::get(logger)->debug("Received 'textChanged' message");
-    std::string srcUri = data["params"]["textDocument"]["uri"].get<std::string>();
-    std::string content = data["params"]["contentChanges"][0]["text"].get<std::string>();
-
-    BuildDiagnosticsRespond(srcUri, content);
+    auto uri = GetNestedValue(data, {"params", "textDocument", "uri"});
+    auto contentChanges = GetNestedValue(data, {"params", "contentChanges" });
+    if(contentChanges && contentChanges->size() > 0) {
+        // Only one content change with the full content of the document is supported.
+        auto lastIdx = contentChanges->size() - 1;
+        auto lastContent = (*contentChanges)[lastIdx];
+        if(lastContent.contains("text")) {
+            auto text = lastContent["text"].get<std::string>();
+            BuildDiagnosticsRespond(uri->get<std::string>(), text);
+        }
+    }
 }
 
 void LSPServerEventsHandler::OnConfiguration(const json &data)
