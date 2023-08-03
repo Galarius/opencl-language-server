@@ -39,11 +39,27 @@ private:
     std::uniform_int_distribution<> dis;
 };
 
-
 std::shared_ptr<IGenerator> CreateDefaultGenerator()
 {
     return std::make_shared<DefaultGenerator>();
 }
+
+class DefaultExitHandler final : public IExitHandler
+{
+public:
+    DefaultExitHandler() = default;
+
+    void OnExit(int code)
+    {
+        exit(code);
+    }
+};
+
+std::shared_ptr<IExitHandler> CreateDefaultExitHandler()
+{
+    return std::make_shared<DefaultExitHandler>();
+}
+
 
 void Trim(std::string& s)
 {

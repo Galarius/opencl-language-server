@@ -23,7 +23,16 @@ struct IGenerator
     virtual std::string GenerateID() = 0;
 };
 
+struct IExitHandler
+{
+    virtual ~IExitHandler() = default;
+
+    virtual void OnExit(int code) = 0;
+};
+
 std::shared_ptr<IGenerator> CreateDefaultGenerator();
+
+std::shared_ptr<IExitHandler> CreateDefaultExitHandler();
 
 void Trim(std::string& s);
 std::vector<std::string> SplitString(const std::string& str, const std::string& pattern);
