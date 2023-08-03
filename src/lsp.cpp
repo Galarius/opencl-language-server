@@ -86,10 +86,12 @@ public:
     LSPServerEventsHandler(
         std::shared_ptr<IJsonRPC> jrpc,
         std::shared_ptr<IDiagnostics> diagnostics,
-        std::shared_ptr<utils::IGenerator> generator)
+        std::shared_ptr<utils::IGenerator> generator,
+        std::shared_ptr<utils::IExitHandler> exitHandler)
         : m_jrpc {std::move(jrpc)}
         , m_diagnostics {std::move(diagnostics)}
         , m_generator {std::move(generator)}
+        , m_exitHandler {std::move(exitHandler)}
     {}
 
     void BuildDiagnosticsRespond(const std::string &uri, const std::string &content);
@@ -108,6 +110,7 @@ private:
     std::shared_ptr<IJsonRPC> m_jrpc;
     std::shared_ptr<IDiagnostics> m_diagnostics;
     std::shared_ptr<utils::IGenerator> m_generator;
+    std::shared_ptr<utils::IExitHandler> m_exitHandler;
     std::queue<json> m_outQueue;
     Capabilities m_capabilities;
     std::queue<std::pair<std::string, std::string>> m_requests;
@@ -370,9 +373,13 @@ void LSPServerEventsHandler::OnExit()
 {
     spdlog::get(logger)->debug("Received 'exit', after 'shutdown': {}", m_shutdown ? "yes" : "no");
     if (m_shutdown)
-        exit(EXIT_SUCCESS);
+    {
+        m_exitHandler->OnExit(EXIT_SUCCESS);
+    }
     else
-        exit(EXIT_FAILURE);
+    {
+        m_exitHandler->OnExit(EXIT_FAILURE);
+    }
 }
 
 // ILSPServer
@@ -462,9 +469,10 @@ void LSPServer::Interrupt()
 std::shared_ptr<ILSPServerEventsHandler> CreateLSPEventsHandler(
     std::shared_ptr<IJsonRPC> jrpc,
     std::shared_ptr<IDiagnostics> diagnostics,
-    std::shared_ptr<utils::IGenerator> generator)
+    std::shared_ptr<utils::IGenerator> generator,
+    std::shared_ptr<utils::IExitHandler> exitHandler)
 {
-    return std::make_shared<LSPServerEventsHandler>(jrpc, diagnostics, generator);
+    return std::make_shared<LSPServerEventsHandler>(jrpc, diagnostics, generator, exitHandler);
 }
 
 std::shared_ptr<ILSPServer> CreateLSPServer(
@@ -476,7 +484,8 @@ std::shared_ptr<ILSPServer> CreateLSPServer(
 std::shared_ptr<ILSPServer> CreateLSPServer(std::shared_ptr<IJsonRPC> jrpc, std::shared_ptr<IDiagnostics> diagnostics)
 {
     auto generator = utils::CreateDefaultGenerator();
-    auto handler = std::make_shared<LSPServerEventsHandler>(jrpc, diagnostics, generator);
+    auto exitHandler = utils::CreateDefaultExitHandler();
+    auto handler = std::make_shared<LSPServerEventsHandler>(jrpc, diagnostics, generator, exitHandler);
     return std::make_shared<LSPServer>(std::move(jrpc), std::move(handler));
 }
 

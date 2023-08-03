@@ -7,6 +7,7 @@
 
 #include "lsp.hpp"
 #include "utils.hpp"
+#include "exit-handler-mock.hpp"
 #include "jsonrpc-mock.hpp"
 #include "diagnostics-mock.hpp"
 #include "generator-mock.hpp"
@@ -26,6 +27,7 @@ protected:
     std::shared_ptr<JsonRPCMock> mockJsonRPC;
     std::shared_ptr<DiagnosticsMock> mockDiagnostics;
     std::shared_ptr<GeneratorMock> mockGenerator;
+    std::shared_ptr<ExitHandlerMock> mockExitHandler;
     std::shared_ptr<ILSPServerEventsHandler> handler;
 
     void SetUp() override
@@ -33,10 +35,11 @@ protected:
         mockJsonRPC = std::make_shared<JsonRPCMock>();
         mockDiagnostics = std::make_shared<DiagnosticsMock>();
         mockGenerator = std::make_shared<GeneratorMock>();
+        mockExitHandler = std::make_shared<ExitHandlerMock>();
 
         ON_CALL(*mockGenerator, GenerateID()).WillByDefault(::testing::Return("12345678"));
 
-        handler = CreateLSPEventsHandler(mockJsonRPC, mockDiagnostics, mockGenerator);
+        handler = CreateLSPEventsHandler(mockJsonRPC, mockDiagnostics, mockGenerator, mockExitHandler);
     }
 
     std::tuple<std::string, std::string> GetTestSource() const
@@ -433,4 +436,41 @@ TEST_F(LSPTest, OnRespond_whenConfigurationRespond_shouldUpdateSettings)
     handler->GetNextResponse();
     handler->OnRespond(data);
     handler->OnRespond(data); // the second call shouldn't trigger settings update
+}
+
+// OnShutdown
+
+TEST_F(LSPTest, OnShutdown_shouldBuildResponse)
+{
+    nlohmann::json data = R"({
+        "id": "12345678"
+    })"_json;
+    nlohmann::json expectedResponse = R"({
+        "id": "12345678",
+        "result": null
+    })"_json;
+
+    handler->OnShutdown(data);
+
+    auto response = handler->GetNextResponse();
+    EXPECT_TRUE(response.has_value());
+    EXPECT_EQ(*response, expectedResponse);
+}
+
+// OnExit
+
+TEST_F(LSPTest, OnExit_shouldExitWithFailureByDefault)
+{
+    EXPECT_CALL(*mockExitHandler, OnExit(EXIT_FAILURE)).Times(1);
+    handler->OnExit();
+}
+
+TEST_F(LSPTest, OnExit_shouldExitWithSuccessAfterShutdownCall)
+{
+    nlohmann::json data = R"({
+        "id": "12345678"
+    })"_json;
+    handler->OnShutdown(data);
+    EXPECT_CALL(*mockExitHandler, OnExit(EXIT_SUCCESS)).Times(1);
+    handler->OnExit();
 }
