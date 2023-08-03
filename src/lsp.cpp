@@ -18,6 +18,11 @@ using namespace nlohmann;
 
 namespace {
 
+constexpr int BuildOptions = 0;
+constexpr int MaxProblemsCount = 1;
+constexpr int DeviceID = 2;
+constexpr int NumConfigurations = 2;
+
 std::optional<nlohmann::json> GetNestedValue(const nlohmann::json &j, const std::vector<std::string> &keys)
 {
     const nlohmann::json *current = &j;
@@ -282,34 +287,44 @@ void LSPServerEventsHandler::OnTextChanged(const json &data)
 
 void LSPServerEventsHandler::OnConfiguration(const json &data)
 {
-    spdlog::get(logger)->debug("Received 'configuration' respond");
-    auto result = data["result"];
-    if (result.empty())
-    {
-        spdlog::get(logger)->warn("Empty result");
-        return;
-    }
-
-    if (result.size() != 3)
-    {
-        spdlog::get(logger)->warn("Unexpected result items count");
-        return;
-    }
-
+    auto log = spdlog::get(logger);
+    log->debug("Received 'configuration' respond");
+    
     try
     {
-        auto buildOptions = result[0];
-        m_diagnostics->SetBuildOptions(buildOptions);
+        auto result = data.at("result");
+        if (result.empty())
+        {
+            log->warn("Empty configuration");
+            return;
+        }
 
-        auto maxProblemsCount = result[1].get<int64_t>();
-        m_diagnostics->SetMaxProblemsCount(static_cast<int>(maxProblemsCount));
+        if (result.size() < NumConfigurations)
+        {
+            log->warn("Unexpected number of options");
+            return;
+        }
 
-        auto deviceID = result[2].get<int64_t>();
-        m_diagnostics->SetOpenCLDevice(static_cast<uint32_t>(deviceID));
+        if (result[BuildOptions].is_array())
+        {
+            m_diagnostics->SetBuildOptions(result[BuildOptions]);
+        }
+
+        if (result[MaxProblemsCount].is_number_integer())
+        {
+            auto maxProblemsCount = result[MaxProblemsCount].get<int64_t>();
+            m_diagnostics->SetMaxProblemsCount(static_cast<int>(maxProblemsCount));
+        }
+
+        if (result[DeviceID].is_number_integer())
+        {
+            auto deviceID = result[DeviceID].get<int64_t>();
+            m_diagnostics->SetOpenCLDevice(static_cast<uint32_t>(deviceID));
+        }
     }
     catch (std::exception &err)
     {
-        spdlog::get(logger)->error("Failed to update settings, {}", err.what());
+        log->error("Failed to update settings, {}", err.what());
     }
 }
 

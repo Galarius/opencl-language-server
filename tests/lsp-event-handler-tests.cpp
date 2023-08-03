@@ -97,7 +97,7 @@ TEST_F(LSPTest, OnInitialize_shouldBuildResponse_andCallDiagnosticsSetters)
             },
             "initializationOptions": {
                 "configuration": {
-                    "buildOptions": { "option": "value" },
+                    "buildOptions": [ "-I", "/usr/local/include" ],
                     "maxNumberOfProblems": 10,
                     "deviceID": 1
                 }
@@ -325,4 +325,24 @@ TEST_F(LSPTest, OnTextChanged_shouldBuildResponse)
 
     EXPECT_TRUE(response.has_value());
     EXPECT_EQ(*response, expectedResponse);
+}
+
+// OnConfiguration
+
+TEST_F(LSPTest, OnConfiguration_shouldUpdateSettings) {
+    nlohmann::json data = R"({
+        "result": [
+            ["-I", "/usr/local/include"],
+            100,
+            1
+        ]
+    })"_json;
+
+    // Set up expectations for the diagnostics object
+    EXPECT_CALL(*mockDiagnostics, SetBuildOptions(R"(["-I", "/usr/local/include"])"_json)).Times(1);
+    EXPECT_CALL(*mockDiagnostics, SetMaxProblemsCount(100)).Times(1);
+    EXPECT_CALL(*mockDiagnostics, SetOpenCLDevice(1)).Times(1);
+
+    // Call the function under test
+    handler->OnConfiguration(data);
 }
