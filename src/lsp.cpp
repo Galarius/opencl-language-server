@@ -263,22 +263,24 @@ void LSPServerEventsHandler::OnTextOpen(const json &data)
     spdlog::get(logger)->debug("Received 'textOpen' message");
     auto uri = GetNestedValue(data, {"params", "textDocument", "uri"});
     auto content = GetNestedValue(data, {"params", "textDocument", "text"});
-    if (uri && content) {
+    if (uri && content)
+    {
         BuildDiagnosticsRespond(uri->get<std::string>(), content->get<std::string>());
     }
-    
 }
 
 void LSPServerEventsHandler::OnTextChanged(const json &data)
 {
     spdlog::get(logger)->debug("Received 'textChanged' message");
     auto uri = GetNestedValue(data, {"params", "textDocument", "uri"});
-    auto contentChanges = GetNestedValue(data, {"params", "contentChanges" });
-    if(contentChanges && contentChanges->size() > 0) {
+    auto contentChanges = GetNestedValue(data, {"params", "contentChanges"});
+    if (contentChanges && contentChanges->size() > 0)
+    {
         // Only one content change with the full content of the document is supported.
         auto lastIdx = contentChanges->size() - 1;
         auto lastContent = (*contentChanges)[lastIdx];
-        if(lastContent.contains("text")) {
+        if (lastContent.contains("text"))
+        {
             auto text = lastContent["text"].get<std::string>();
             BuildDiagnosticsRespond(uri->get<std::string>(), text);
         }
@@ -289,7 +291,7 @@ void LSPServerEventsHandler::OnConfiguration(const json &data)
 {
     auto log = spdlog::get(logger);
     log->debug("Received 'configuration' respond");
-    
+
     try
     {
         auto result = data.at("result");
@@ -331,17 +333,17 @@ void LSPServerEventsHandler::OnConfiguration(const json &data)
 void LSPServerEventsHandler::OnRespond(const json &data)
 {
     spdlog::get(logger)->debug("Received client respond");
-    if (m_requests.empty()) {
+    if (m_requests.empty())
+    {
         spdlog::get(logger)->warn("Unexpected respond {}", data.dump());
         return;
     }
-        
+
     try
     {
         const auto id = data["id"];
         auto request = m_requests.front();
-        if (id == request.second &&
-            "workspace/configuration" == request.first)
+        if (id == request.second && "workspace/configuration" == request.first)
         {
             OnConfiguration(data);
         }
