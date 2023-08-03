@@ -331,13 +331,29 @@ void LSPServerEventsHandler::OnConfiguration(const json &data)
 void LSPServerEventsHandler::OnRespond(const json &data)
 {
     spdlog::get(logger)->debug("Received client respond");
-    const auto id = data["id"];
-    if (!m_requests.empty())
+    if (m_requests.empty()) {
+        spdlog::get(logger)->warn("Unexpected respond {}", data.dump());
+        return;
+    }
+        
+    try
     {
+        const auto id = data["id"];
         auto request = m_requests.front();
-        if (id == request.second && request.first == "workspace/configuration")
+        if (id == request.second &&
+            "workspace/configuration" == request.first)
+        {
             OnConfiguration(data);
+        }
+        else
+        {
+            spdlog::get(logger)->warn("Out of order respond");
+        }
         m_requests.pop();
+    }
+    catch (std::exception &err)
+    {
+        spdlog::get(logger)->error("OnRespond failed, {}", err.what());
     }
 }
 

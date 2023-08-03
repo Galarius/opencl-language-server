@@ -338,11 +338,100 @@ TEST_F(LSPTest, OnConfiguration_shouldUpdateSettings) {
         ]
     })"_json;
 
-    // Set up expectations for the diagnostics object
     EXPECT_CALL(*mockDiagnostics, SetBuildOptions(R"(["-I", "/usr/local/include"])"_json)).Times(1);
     EXPECT_CALL(*mockDiagnostics, SetMaxProblemsCount(100)).Times(1);
     EXPECT_CALL(*mockDiagnostics, SetOpenCLDevice(1)).Times(1);
 
-    // Call the function under test
     handler->OnConfiguration(data);
+}
+
+// GetConfiguration
+
+TEST_F(LSPTest, GetConfiguration_whenHasConfigurationCapabilityNotSet_shouldDoNothing) {
+    handler->GetConfiguration();
+    EXPECT_FALSE(handler->GetNextResponse().has_value());
+}
+
+TEST_F(LSPTest, GetConfiguration_whenHasConfigurationCapability_shouldBuildResponse) {
+    nlohmann::json initialData = R"({
+        "params": {
+            "capabilities": {
+                "workspace": {
+                    "configuration": true,
+                    "didChangeConfiguration": {"dynamicRegistration": true}
+                }
+            },
+            "initializationOptions": {
+                "configuration": {
+
+                }
+            }
+        },
+        "id": "1"
+    })"_json;
+    
+    nlohmann::json expectedResponse = R"({
+        "id": "12345678",
+        "method": "workspace/configuration",
+        "params": {
+            "items": [
+                {"section": "OpenCL.server.buildOptions"},
+                {"section": "OpenCL.server.maxNumberOfProblems"},
+                {"section": "OpenCL.server.deviceID"}
+            ]
+        }
+    })"_json;
+    
+    EXPECT_CALL(*mockGenerator, GenerateID()).Times(1);
+    
+    handler->OnInitialize(initialData);
+    handler->GetNextResponse();
+    handler->GetConfiguration();
+    
+    auto response = handler->GetNextResponse();
+    EXPECT_TRUE(response.has_value());
+    EXPECT_EQ(*response, expectedResponse);
+}
+
+// OnRespond
+
+TEST_F(LSPTest, OnRespond_whenConfigurationRespond_shouldUpdateSettings) {
+    
+    nlohmann::json initialData = R"({
+        "params": {
+            "capabilities": {
+                "workspace": {
+                    "configuration": true,
+                    "didChangeConfiguration": {"dynamicRegistration": true}
+                }
+            },
+            "initializationOptions": {
+                "configuration": {
+
+                }
+            }
+        },
+        "id": "1"
+    })"_json;
+    
+    nlohmann::json data = R"({
+        "id": "12345678",
+        "result": [
+            ["-I", "/usr/local/include"],
+            100,
+            1
+        ]
+    })"_json;
+
+    EXPECT_CALL(*mockGenerator, GenerateID()).Times(1);
+    EXPECT_CALL(*mockDiagnostics, SetBuildOptions(R"(["-I", "/usr/local/include"])"_json)).Times(1);
+    EXPECT_CALL(*mockDiagnostics, SetMaxProblemsCount(100)).Times(1);
+    EXPECT_CALL(*mockDiagnostics, SetOpenCLDevice(1)).Times(1);
+    
+    handler->OnInitialize(initialData);
+    handler->GetNextResponse();
+    handler->GetConfiguration();
+    handler->GetNextResponse();
+    handler->OnRespond(data);
+    handler->OnRespond(data);   // the second call shouldn't trigger settings update
 }
