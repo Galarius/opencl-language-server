@@ -38,8 +38,9 @@ protected:
 
         handler = CreateLSPEventsHandler(mockJsonRPC, mockDiagnostics, mockGenerator);
     }
-    
-    std::tuple<std::string, std::string> GetTestSource() const {
+
+    std::tuple<std::string, std::string> GetTestSource() const
+    {
         std::string uri = "kernel.cl";
         std::string content =
             R"(__kernel void add(__global double* a, __global double* b, __global double* c, const unsigned int n) {
@@ -50,26 +51,30 @@ protected:
         })";
         return std::make_tuple(uri, content);
     }
-    
-    nlohmann::json GetTestDiagnostics(const std::string& uri) const {
-        return {{
-            {"source", uri},
-            {"range", {
-                {"start", {
-                    {"line", 1},
-                    {"character", 1},
-                }},
-                {"end", {
-                    {"line", 1},
-                    {"character", 2},
-                }},
-                {"severity", 2},
-                {"message", "message"},
-            }}
-        }};
+
+    nlohmann::json GetTestDiagnostics(const std::string& uri) const
+    {
+        return {
+            {{"source", uri},
+             {"range",
+              {
+                  {"start",
+                   {
+                       {"line", 1},
+                       {"character", 1},
+                   }},
+                  {"end",
+                   {
+                       {"line", 1},
+                       {"character", 2},
+                   }},
+                  {"severity", 2},
+                  {"message", "message"},
+              }}}};
     }
-    
-    nlohmann::json GetTestDiagnosticsResponse(const std::string& uri) const {
+
+    nlohmann::json GetTestDiagnosticsResponse(const std::string& uri) const
+    {
         return {
             {"method", "textDocument/publishDiagnostics"},
             {"params",
@@ -252,7 +257,7 @@ TEST_F(LSPTest, BuildDiagnosticsRespond_shouldBuildResponse)
     auto expectedResponse = GetTestDiagnosticsResponse(uri);
 
     ON_CALL(*mockDiagnostics, Get(testing::_)).WillByDefault(::testing::Return(expectedDiagnostics));
-    EXPECT_CALL(*mockDiagnostics, Get(Source{uri, content})).Times(1);
+    EXPECT_CALL(*mockDiagnostics, Get(Source {uri, content})).Times(1);
 
     handler->BuildDiagnosticsRespond(uri, content);
     auto response = handler->GetNextResponse();
@@ -265,10 +270,11 @@ TEST_F(LSPTest, BuildDiagnosticsRespond_withException_shouldReplyWithError)
 {
     auto [uri, content] = GetTestSource();
     Source expectedSource {uri, content};
-    
+
     ON_CALL(*mockDiagnostics, Get(testing::_)).WillByDefault(::testing::Throw(std::runtime_error("Exception")));
     EXPECT_CALL(*mockDiagnostics, Get(expectedSource)).Times(1);
-    EXPECT_CALL(*mockJsonRPC, WriteError(JRPCErrorCode::InternalError, "Failed to get diagnostics: Exception")).Times(1);
+    EXPECT_CALL(*mockJsonRPC, WriteError(JRPCErrorCode::InternalError, "Failed to get diagnostics: Exception"))
+        .Times(1);
 
     handler->BuildDiagnosticsRespond(uri, content);
 }
@@ -280,15 +286,8 @@ TEST_F(LSPTest, OnTextOpen_shouldBuildResponse)
     auto [uri, content] = GetTestSource();
     auto expectedDiagnostics = GetTestDiagnostics(uri);
     auto expectedResponse = GetTestDiagnosticsResponse(uri);
-    nlohmann::json request = {
-        {"params", {
-            {"textDocument", {
-                {"uri", uri},
-                {"text", content}
-            }}
-        }}
-    };
-    
+    nlohmann::json request = {{"params", {{"textDocument", {{"uri", uri}, {"text", content}}}}}};
+
     ON_CALL(*mockDiagnostics, Get(testing::_)).WillByDefault(::testing::Return(expectedDiagnostics));
     EXPECT_CALL(*mockDiagnostics, Get(Source {uri, content})).Times(1);
 
@@ -307,16 +306,13 @@ TEST_F(LSPTest, OnTextChanged_shouldBuildResponse)
     auto expectedDiagnostics = GetTestDiagnostics(uri);
     auto expectedResponse = GetTestDiagnosticsResponse(uri);
     nlohmann::json request = {
-        {"params", {
-            {"textDocument", {
-                {"uri", uri},
-            }},
-            {"contentChanges", {{
-                {"text", content}
-            }}}
-        }}
-    };
-    
+        {"params",
+         {{"textDocument",
+           {
+               {"uri", uri},
+           }},
+          {"contentChanges", {{{"text", content}}}}}}};
+
     ON_CALL(*mockDiagnostics, Get(testing::_)).WillByDefault(::testing::Return(expectedDiagnostics));
     EXPECT_CALL(*mockDiagnostics, Get(Source {uri, content})).Times(1);
 
@@ -329,7 +325,8 @@ TEST_F(LSPTest, OnTextChanged_shouldBuildResponse)
 
 // OnConfiguration
 
-TEST_F(LSPTest, OnConfiguration_shouldUpdateSettings) {
+TEST_F(LSPTest, OnConfiguration_shouldUpdateSettings)
+{
     nlohmann::json data = R"({
         "result": [
             ["-I", "/usr/local/include"],
@@ -347,12 +344,14 @@ TEST_F(LSPTest, OnConfiguration_shouldUpdateSettings) {
 
 // GetConfiguration
 
-TEST_F(LSPTest, GetConfiguration_whenHasConfigurationCapabilityNotSet_shouldDoNothing) {
+TEST_F(LSPTest, GetConfiguration_whenHasConfigurationCapabilityNotSet_shouldDoNothing)
+{
     handler->GetConfiguration();
     EXPECT_FALSE(handler->GetNextResponse().has_value());
 }
 
-TEST_F(LSPTest, GetConfiguration_whenHasConfigurationCapability_shouldBuildResponse) {
+TEST_F(LSPTest, GetConfiguration_whenHasConfigurationCapability_shouldBuildResponse)
+{
     nlohmann::json initialData = R"({
         "params": {
             "capabilities": {
@@ -369,7 +368,7 @@ TEST_F(LSPTest, GetConfiguration_whenHasConfigurationCapability_shouldBuildRespo
         },
         "id": "1"
     })"_json;
-    
+
     nlohmann::json expectedResponse = R"({
         "id": "12345678",
         "method": "workspace/configuration",
@@ -381,13 +380,13 @@ TEST_F(LSPTest, GetConfiguration_whenHasConfigurationCapability_shouldBuildRespo
             ]
         }
     })"_json;
-    
+
     EXPECT_CALL(*mockGenerator, GenerateID()).Times(1);
-    
+
     handler->OnInitialize(initialData);
     handler->GetNextResponse();
     handler->GetConfiguration();
-    
+
     auto response = handler->GetNextResponse();
     EXPECT_TRUE(response.has_value());
     EXPECT_EQ(*response, expectedResponse);
@@ -395,8 +394,8 @@ TEST_F(LSPTest, GetConfiguration_whenHasConfigurationCapability_shouldBuildRespo
 
 // OnRespond
 
-TEST_F(LSPTest, OnRespond_whenConfigurationRespond_shouldUpdateSettings) {
-    
+TEST_F(LSPTest, OnRespond_whenConfigurationRespond_shouldUpdateSettings)
+{
     nlohmann::json initialData = R"({
         "params": {
             "capabilities": {
@@ -413,7 +412,7 @@ TEST_F(LSPTest, OnRespond_whenConfigurationRespond_shouldUpdateSettings) {
         },
         "id": "1"
     })"_json;
-    
+
     nlohmann::json data = R"({
         "id": "12345678",
         "result": [
@@ -427,11 +426,11 @@ TEST_F(LSPTest, OnRespond_whenConfigurationRespond_shouldUpdateSettings) {
     EXPECT_CALL(*mockDiagnostics, SetBuildOptions(R"(["-I", "/usr/local/include"])"_json)).Times(1);
     EXPECT_CALL(*mockDiagnostics, SetMaxProblemsCount(100)).Times(1);
     EXPECT_CALL(*mockDiagnostics, SetOpenCLDevice(1)).Times(1);
-    
+
     handler->OnInitialize(initialData);
     handler->GetNextResponse();
     handler->GetConfiguration();
     handler->GetNextResponse();
     handler->OnRespond(data);
-    handler->OnRespond(data);   // the second call shouldn't trigger settings update
+    handler->OnRespond(data); // the second call shouldn't trigger settings update
 }
