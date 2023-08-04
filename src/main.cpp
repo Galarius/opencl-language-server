@@ -91,12 +91,14 @@ inline void SetupBinaryStreamMode()
 int main(int argc, char* argv[])
 {
     bool flagLogTofile = false;
-    bool flagCLInfo = false;
     std::string optLogFile = "opencl-language-server.log";
     spdlog::level::level_enum optLogLevel = spdlog::level::trace;
 
-    CLI::App app {"OpenCL Language Server"};
-    app.add_flag("-i,--clinfo", flagCLInfo, "Show information about available OpenCL devices");
+    CLI::App app {
+        "OpenCL Language Server\n"
+        "The language server communicates with a client using JSON-RPC protocol.\n"
+        "You can stop the server by sending an interrupt signal followed by any character sent to standard input.\n"
+    };
     app.add_flag("-e,--enable-file-logging", flagLogTofile, "Enable file logging");
     app.add_option("-f,--log-file", optLogFile, "Path to log file")->required(false)->capture_default_str();
     app.add_option("-l,--log-level", optLogLevel, "Log level")
@@ -116,17 +118,22 @@ int main(int argc, char* argv[])
             exit(0);
         },
         "Show version");
+    
+    bool flagPrettyPrint = false;
+    auto clinfoCmd = app.add_subcommand("clinfo", "Show information about available OpenCL devices");
+    clinfoCmd->add_flag("-p,--pretty-print", flagPrettyPrint, "Enable pretty-printing");
 
     CLI11_PARSE(app, argc, argv);
 
     ConfigureLogging(flagLogTofile, optLogFile, optLogLevel);
 
     auto clinfo = CreateCLInfo();
-    if (flagCLInfo)
+    if (*clinfoCmd)
     {
         const auto jsonBody = clinfo->json();
-        std::cout << jsonBody.dump() << std::endl;
-        exit(0);
+        const int indentation = flagPrettyPrint ? 4 : -1;
+        std::cout << jsonBody.dump(indentation) << std::endl;
+        return 0;
     }
 
     SetupBinaryStreamMode();
