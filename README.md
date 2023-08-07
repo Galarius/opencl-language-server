@@ -33,10 +33,10 @@ You can configure diagnostics with `json-rpc` request during the intitialization
 
 |||
 | --- | --- |
-| `buildOptions` | Build options to be used for building the program. The list of [supported](https://registry.khronos.org/OpenCL/sdk/2.1/docs/man/xhtml/clBuildProgram.html) build options. |
+| `buildOptions` | Options to be utilized when building the program. The list of [supported](https://registry.khronos.org/OpenCL/sdk/2.1/docs/man/xhtml/clBuildProgram.html) build options. |
 | `deviceID` | Device ID or 0 (automatic selection) of the OpenCL device to be used for diagnostics. |
 | |  *Run `./opencl-language-server --clinfo` to get information about available OpenCL devices including identifiers.* |
-| `maxNumberOfProblems` | Controls the maximum number of problems produced by the language server. |
+| `maxNumberOfProblems` | Controls the maximum number of errors parsed by the language server. |
 
 ## Development
 

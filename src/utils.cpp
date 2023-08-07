@@ -9,6 +9,7 @@
 
 #include <algorithm>
 #include <functional>
+#include <fstream>
 #include <iomanip>
 #include <random>
 #include <regex>
@@ -119,6 +120,22 @@ std::string UriToPath(const std::string& uri)
 bool EndsWith(const std::string& str, const std::string& suffix)
 {
     return str.size() >= suffix.size() && 0 == str.compare(str.size() - suffix.size(), suffix.size(), suffix);
+}
+
+std::optional<std::string> ReadFileContent(std::string_view fileName)
+{
+    std::string content;
+    std::ifstream file(fileName);
+    if (file.is_open()) {
+       std::stringstream buffer;
+       buffer << file.rdbuf();
+       file.close();
+       content = buffer.str();
+    } else {
+        spdlog::error("Unable to open file '{}'", fileName);
+        return std::nullopt;
+    }
+    return content;
 }
 
 namespace internal {

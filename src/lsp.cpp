@@ -244,7 +244,7 @@ void LSPServerEventsHandler::BuildDiagnosticsRespond(const std::string &uri, con
         const auto filePath = utils::UriToPath(uri);
         spdlog::get(logger)->debug("Converted uri '{}' to path '{}'", uri, filePath);
 
-        json diags = m_diagnostics->Get({filePath, content});
+        json diags = m_diagnostics->GetDiagnostics({filePath, content});
         m_outQueue.push(
             {{"method", "textDocument/publishDiagnostics"},
              {"params",

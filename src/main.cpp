@@ -2,7 +2,7 @@
 //  main.cpp
 //  opencl-language-server
 //
-//  Created by Ilya Shoshin (Galarius) on 7/14/21.
+//  Created by Ilia Shoshin on 7/14/21.
 //
 
 #include <iostream>
@@ -29,6 +29,112 @@
 using namespace ocls;
 
 namespace {
+
+struct SubCommand
+{
+    SubCommand(CLI::App& app, std::string name, std::string description) : cmd {app.add_subcommand(name, description)}
+    {}
+
+    ~SubCommand() = default;
+
+    bool IsParsed() const
+    {
+        return cmd->parsed();
+    }
+
+protected:
+    CLI::App* cmd;
+};
+
+struct CLInfoSubCommand final : public SubCommand
+{
+    CLInfoSubCommand(CLI::App& app) : SubCommand(app, "clinfo", "Show information about available OpenCL devices")
+    {
+        cmd->add_flag("-p,--pretty-print", prettyPrint, "Enable pretty-printing");
+    }
+
+    int Execute(const std::shared_ptr<ICLInfo>& clinfo)
+    {
+        const auto jsonBody = clinfo->json();
+        const int indentation = prettyPrint ? 4 : -1;
+        std::cout << jsonBody.dump(indentation) << std::endl;
+        return EXIT_SUCCESS;
+    }
+
+private:
+    bool prettyPrint = false;
+};
+
+struct DiagnosticsSubCommand final : public SubCommand
+{
+    DiagnosticsSubCommand(CLI::App& app) : SubCommand(app, "diagnostics", "Provides an OpenCL kernel diagnostics")
+    {
+        cmd->add_flag("-j,--json", json, "Print diagnostics in JSON format");
+        cmd->add_option("-k,--kernel", kernel, "Path to a kernel file")->required(true);
+        cmd->add_option("-b,--build-options", buildOptions, "Options to be utilized when building the program.")
+            ->capture_default_str();
+        cmd->add_option(
+               "-d,--device-id",
+               deviceID,
+               "Device ID or 0 (automatic selection) of the OpenCL device to be used for diagnostics.")
+            ->capture_default_str();
+        cmd->add_option("--error-limit", maxNumberOfProblems, "The maximum number of errors parsed by the compiler.")
+            ->capture_default_str();
+    }
+
+    int Execute(const std::shared_ptr<IDiagnostics>& diagnostics)
+    {
+        auto content = utils::ReadFileContent(kernel);
+        if (!content.has_value())
+        {
+            return EXIT_FAILURE;
+        }
+
+        try
+        {
+            if (!buildOptions.empty())
+            {
+                diagnostics->SetBuildOptions(buildOptions);
+            }
+
+            if (deviceID > 0)
+            {
+                diagnostics->SetOpenCLDevice(deviceID);
+            }
+
+            if (maxNumberOfProblems != INT8_MAX)
+            {
+                diagnostics->SetMaxProblemsCount(maxNumberOfProblems);
+            }
+
+            Source source {kernel, *content};
+            if (json)
+            {
+                auto output = diagnostics->GetDiagnostics(source);
+                std::cout << output.dump(4) << std::endl;
+            }
+            else
+            {
+                auto output = diagnostics->GetBuildLog(source);
+                std::cout << output << std::endl;
+            }
+        }
+        catch (std::exception& err)
+        {
+            std::cerr << "Failed to get diagnostics: " << err.what() << std::endl;
+            return EXIT_FAILURE;
+        }
+
+        return EXIT_SUCCESS;
+    }
+
+private:
+    std::string kernel;
+    std::string buildOptions;
+    uint32_t deviceID = 0;
+    uint64_t maxNumberOfProblems = INT8_MAX;
+    bool json = false;
+};
 
 std::shared_ptr<ILSPServer> server;
 
@@ -77,10 +183,12 @@ inline void SetupBinaryStreamMode()
 {
 #if defined(WIN32)
     // to handle CRLF
-    if (_setmode(_fileno(stdin), _O_BINARY) == -1) {
+    if (_setmode(_fileno(stdin), _O_BINARY) == -1)
+    {
         spdlog::error("Cannot set stdin mode to _O_BINARY");
     }
-    if (_setmode(_fileno(stdout), _O_BINARY) == -1) {
+    if (_setmode(_fileno(stdout), _O_BINARY) == -1)
+    {
         spdlog::error("Cannot set stdout mode to _O_BINARY");
     }
 #endif
@@ -94,11 +202,10 @@ int main(int argc, char* argv[])
     std::string optLogFile = "opencl-language-server.log";
     spdlog::level::level_enum optLogLevel = spdlog::level::trace;
 
-    CLI::App app {
-        "OpenCL Language Server\n"
-        "The language server communicates with a client using JSON-RPC protocol.\n"
-        "You can stop the server by sending an interrupt signal followed by any character sent to standard input.\n"
-    };
+    CLI::App app {"OpenCL Language Server\n"
+                  "The language server communicates with a client using JSON-RPC protocol.\n"
+                  "Stop the server by sending an interrupt signal followed by any character sent to standard input.\n"
+                  "Optionally, you can use subcommands to access functionality without starting the server.\n"};
     app.add_flag("-e,--enable-file-logging", flagLogTofile, "Enable file logging");
     app.add_option("-f,--log-file", optLogFile, "Path to log file")->required(false)->capture_default_str();
     app.add_option("-l,--log-level", optLogLevel, "Log level")
@@ -115,33 +222,31 @@ int main(int argc, char* argv[])
         "-v,--version",
         []() {
             std::cout << ocls::version << std::endl;
-            exit(0);
+            exit(EXIT_SUCCESS);
         },
         "Show version");
-    
-    bool flagPrettyPrint = false;
-    auto clinfoCmd = app.add_subcommand("clinfo", "Show information about available OpenCL devices");
-    clinfoCmd->add_flag("-p,--pretty-print", flagPrettyPrint, "Enable pretty-printing");
 
+    CLInfoSubCommand clInfoCmd(app);
+    DiagnosticsSubCommand diagnosticsCmd(app);
     CLI11_PARSE(app, argc, argv);
-
     ConfigureLogging(flagLogTofile, optLogFile, optLogLevel);
 
     auto clinfo = CreateCLInfo();
-    if (*clinfoCmd)
+    if (clInfoCmd.IsParsed())
     {
-        const auto jsonBody = clinfo->json();
-        const int indentation = flagPrettyPrint ? 4 : -1;
-        std::cout << jsonBody.dump(indentation) << std::endl;
-        return 0;
+        return clInfoCmd.Execute(clinfo);
+    }
+
+    auto diagnostics = CreateDiagnostics(clinfo);
+    if (diagnosticsCmd.IsParsed())
+    {
+        return diagnosticsCmd.Execute(diagnostics);
     }
 
     SetupBinaryStreamMode();
-
     std::signal(SIGINT, SignalHandler);
 
     auto jrpc = CreateJsonRPC();
-    auto diagnostics = CreateDiagnostics(clinfo);
     server = CreateLSPServer(jrpc, diagnostics);
     return server->Run();
 }

@@ -31,9 +31,12 @@ struct IDiagnostics
     virtual ~IDiagnostics() = default;
 
     virtual void SetBuildOptions(const nlohmann::json& options) = 0;
+    virtual void SetBuildOptions(const std::string& options) = 0;
     virtual void SetMaxProblemsCount(uint64_t maxNumberOfProblems) = 0;
     virtual void SetOpenCLDevice(uint32_t identifier) = 0;
-    virtual nlohmann::json Get(const Source& source) = 0;
+
+    virtual std::string GetBuildLog(const Source& source) = 0;
+    virtual nlohmann::json GetDiagnostics(const Source& source) = 0;
 };
 
 std::shared_ptr<IDiagnostics> CreateDiagnostics(std::shared_ptr<ICLInfo> clInfo);

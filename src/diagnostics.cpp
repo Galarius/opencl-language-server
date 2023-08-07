@@ -63,9 +63,11 @@ public:
     explicit Diagnostics(std::shared_ptr<ICLInfo> clInfo);
 
     void SetBuildOptions(const nlohmann::json& options);
+    void SetBuildOptions(const std::string& options);
     void SetMaxProblemsCount(uint64_t maxNumberOfProblems);
     void SetOpenCLDevice(uint32_t identifier);
-    nlohmann::json Get(const Source& source);
+    std::string GetBuildLog(const Source& source);
+    nlohmann::json GetDiagnostics(const Source& source);
 
 private:
     nlohmann::json BuildDiagnostics(const std::string& buildLog, const std::string& name);
@@ -237,26 +239,27 @@ nlohmann::json Diagnostics::BuildDiagnostics(const std::string& buildLog, const 
     return diagnostics;
 }
 
-nlohmann::json Diagnostics::Get(const Source& source)
+std::string Diagnostics::GetBuildLog(const Source& source)
 {
     if (!m_device.has_value())
     {
         throw std::runtime_error("missing OpenCL device");
     }
-
     spdlog::get(logger)->trace("Getting diagnostics...");
-    std::string buildLog;
-    std::string srcName;
+    return BuildSource(source.text);
+}
 
+nlohmann::json Diagnostics::GetDiagnostics(const Source& source)
+{
+    std::string buildLog = GetBuildLog(source);
+    std::string srcName;
     if (!source.filePath.empty())
     {
         auto filePath = std::filesystem::path(source.filePath).string();
         srcName = std::filesystem::path(filePath).filename().string();
     }
-
     buildLog = BuildSource(source.text);
-    spdlog::get(logger)->trace("BuildLog:\n", buildLog);
-
+    spdlog::get(logger)->trace("BuildLog:\n{}", buildLog);
     return BuildDiagnostics(buildLog, srcName);
 }
 
@@ -264,19 +267,20 @@ void Diagnostics::SetBuildOptions(const json& options)
 {
     try
     {
-        std::string args;
-        for (auto option : options)
-        {
-            args.append(option.get<std::string>());
-            args.append(" ");
-        }
-        m_BuildOptions = std::move(args);
-        spdlog::get(logger)->trace("Set build options, {}", m_BuildOptions);
+        auto concat = [](const std::string& acc, const json& j) { return acc + j.get<std::string>() + " "; };
+        auto opts = std::accumulate(options.begin(), options.end(), std::string(), concat);
+        SetBuildOptions(opts);
     }
     catch (std::exception& e)
     {
         spdlog::get(logger)->error("Failed to parse build options, {}", e.what());
     }
+}
+
+void Diagnostics::SetBuildOptions(const std::string& options)
+{
+    m_BuildOptions = options;
+    spdlog::get(logger)->trace("Set build options, {}", m_BuildOptions);
 }
 
 void Diagnostics::SetMaxProblemsCount(uint64_t maxNumberOfProblems)

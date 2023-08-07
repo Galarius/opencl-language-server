@@ -259,8 +259,8 @@ TEST_F(LSPTest, BuildDiagnosticsRespond_shouldBuildResponse)
     auto expectedDiagnostics = GetTestDiagnostics(uri);
     auto expectedResponse = GetTestDiagnosticsResponse(uri);
 
-    ON_CALL(*mockDiagnostics, Get(testing::_)).WillByDefault(::testing::Return(expectedDiagnostics));
-    EXPECT_CALL(*mockDiagnostics, Get(Source {uri, content})).Times(1);
+    ON_CALL(*mockDiagnostics, GetDiagnostics(testing::_)).WillByDefault(::testing::Return(expectedDiagnostics));
+    EXPECT_CALL(*mockDiagnostics, GetDiagnostics(Source {uri, content})).Times(1);
 
     handler->BuildDiagnosticsRespond(uri, content);
     auto response = handler->GetNextResponse();
@@ -274,8 +274,8 @@ TEST_F(LSPTest, BuildDiagnosticsRespond_withException_shouldReplyWithError)
     auto [uri, content] = GetTestSource();
     Source expectedSource {uri, content};
 
-    ON_CALL(*mockDiagnostics, Get(testing::_)).WillByDefault(::testing::Throw(std::runtime_error("Exception")));
-    EXPECT_CALL(*mockDiagnostics, Get(expectedSource)).Times(1);
+    ON_CALL(*mockDiagnostics, GetDiagnostics(testing::_)).WillByDefault(::testing::Throw(std::runtime_error("Exception")));
+    EXPECT_CALL(*mockDiagnostics, GetDiagnostics(expectedSource)).Times(1);
     EXPECT_CALL(*mockJsonRPC, WriteError(JRPCErrorCode::InternalError, "Failed to get diagnostics: Exception"))
         .Times(1);
 
@@ -291,8 +291,8 @@ TEST_F(LSPTest, OnTextOpen_shouldBuildResponse)
     auto expectedResponse = GetTestDiagnosticsResponse(uri);
     nlohmann::json request = {{"params", {{"textDocument", {{"uri", uri}, {"text", content}}}}}};
 
-    ON_CALL(*mockDiagnostics, Get(testing::_)).WillByDefault(::testing::Return(expectedDiagnostics));
-    EXPECT_CALL(*mockDiagnostics, Get(Source {uri, content})).Times(1);
+    ON_CALL(*mockDiagnostics, GetDiagnostics(testing::_)).WillByDefault(::testing::Return(expectedDiagnostics));
+    EXPECT_CALL(*mockDiagnostics, GetDiagnostics(Source {uri, content})).Times(1);
 
     handler->OnTextOpen(request);
     auto response = handler->GetNextResponse();
@@ -316,8 +316,8 @@ TEST_F(LSPTest, OnTextChanged_shouldBuildResponse)
            }},
           {"contentChanges", {{{"text", content}}}}}}};
 
-    ON_CALL(*mockDiagnostics, Get(testing::_)).WillByDefault(::testing::Return(expectedDiagnostics));
-    EXPECT_CALL(*mockDiagnostics, Get(Source {uri, content})).Times(1);
+    ON_CALL(*mockDiagnostics, GetDiagnostics(testing::_)).WillByDefault(::testing::Return(expectedDiagnostics));
+    EXPECT_CALL(*mockDiagnostics, GetDiagnostics(Source {uri, content})).Times(1);
 
     handler->OnTextChanged(request);
     auto response = handler->GetNextResponse();
