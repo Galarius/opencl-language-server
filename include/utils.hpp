@@ -37,7 +37,7 @@ std::shared_ptr<IExitHandler> CreateDefaultExitHandler();
 
 void Trim(std::string& s);
 std::vector<std::string> SplitString(const std::string& str, const std::string& pattern);
-std::string UriToPath(const std::string& uri);
+std::string UriToFilePath(const std::string& uri);
 bool EndsWith(const std::string& str, const std::string& suffix);
 std::optional<std::string> ReadFileContent(std::string_view fileName);
 

@@ -16,6 +16,8 @@
 #include <spdlog/spdlog.h>
 #include <sstream>
 
+#include <uriparser/Uri.h>
+
 namespace ocls::utils {
 
 class DefaultGenerator final : public IGenerator
@@ -78,43 +80,26 @@ std::vector<std::string> SplitString(const std::string& str, const std::string& 
     return result;
 }
 
-// Limited file uri -> path converter
-std::string UriToPath(const std::string& uri)
+std::string UriToFilePath(const std::string& uri)
 {
-    try
-    {
-        std::string str = uri;
-        auto pos = str.find("file://");
-        if (pos != std::string::npos)
-            str.replace(pos, 7, "");
-        do
-        {
-            pos = str.find("%3A");
-            if (pos != std::string::npos)
-                str.replace(pos, 3, ":");
-        } while (pos != std::string::npos);
-
-        do
-        {
-            pos = str.find("%20");
-            if (pos != std::string::npos)
-                str.replace(pos, 3, " ");
-        } while (pos != std::string::npos);
-
+    const size_t bytesNeeded = 8 + 3 * uri.length() + 1;
+    char* fileName = (char*)malloc(bytesNeeded * sizeof(char));
 #if defined(WIN32)
-        // remove first /
-        if (str.rfind("/", 0) == 0)
-        {
-            str.replace(0, 1, "");
-        }
-#endif
-        return str;
-    }
-    catch (std::exception& e)
+    if (uriUriStringToWindowsFilenameA(uri.c_str(), fileName) != URI_SUCCESS)
     {
-        spdlog::error("Failed to convert file uri to path, {}", e.what());
+        free(fileName);
+        throw std::runtime_error("Failed to convert URI to Windows filename.");
     }
-    return uri;
+#else
+    if (uriUriStringToUnixFilenameA(uri.c_str(), fileName) != URI_SUCCESS)
+    {
+        free(fileName);
+        throw std::runtime_error("Failed to convert URI to Unix filename.");
+    }
+#endif
+    std::string result(fileName);
+    free(fileName);
+    return result;
 }
 
 bool EndsWith(const std::string& str, const std::string& suffix)
@@ -126,12 +111,15 @@ std::optional<std::string> ReadFileContent(std::string_view fileName)
 {
     std::string content;
     std::ifstream file(fileName);
-    if (file.is_open()) {
-       std::stringstream buffer;
-       buffer << file.rdbuf();
-       file.close();
-       content = buffer.str();
-    } else {
+    if (file.is_open())
+    {
+        std::stringstream buffer;
+        buffer << file.rdbuf();
+        file.close();
+        content = buffer.str();
+    }
+    else
+    {
         spdlog::error("Unable to open file '{}'", fileName);
         return std::nullopt;
     }

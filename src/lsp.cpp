@@ -241,7 +241,7 @@ void LSPServerEventsHandler::BuildDiagnosticsRespond(const std::string &uri, con
 {
     try
     {
-        const auto filePath = utils::UriToPath(uri);
+        const auto filePath = utils::UriToFilePath(uri);
         spdlog::get(logger)->debug("Converted uri '{}' to path '{}'", uri, filePath);
 
         json diags = m_diagnostics->GetDiagnostics({filePath, content});
