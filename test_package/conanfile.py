@@ -27,6 +27,6 @@ class TestPackageConan(ConanFile):
         assert len(output.getvalue()) > 0
 
         output = StringIO()
-        self.run(f"{opencl_ls} --clinfo", output)
+        self.run(f"{opencl_ls} clinfo", output)
         clinfo = json.loads(output.getvalue())
         print(json.dumps(clinfo, indent=2))
