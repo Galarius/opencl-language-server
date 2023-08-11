@@ -10,7 +10,7 @@ set(test_sources
     lsp-event-handler-tests.cpp
     main.cpp
 )
-set(libs GTest::gmock nlohmann_json::nlohmann_json spdlog::spdlog OpenCL::HeadersCpp)
+set(libs GTest::gmock nlohmann_json::nlohmann_json spdlog::spdlog OpenCL::HeadersCpp uriparser::uriparser)
 if(LINUX)
     set(libs ${libs} stdc++fs OpenCL::OpenCL)
 elseif(APPLE)

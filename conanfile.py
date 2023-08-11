@@ -24,6 +24,7 @@ class OpenCLLanguageServerConanfile(ConanFile):
         "nlohmann_json/[^3.11.2]",
         "opencl-clhpp-headers/2022.09.30",
         "spdlog/[^1.11.0]",
+        "uriparser/[^0.9.7]"
     )
     exports_sources = (
         "include/**",
