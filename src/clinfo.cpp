@@ -2,7 +2,7 @@
 //  clinfo.cpp
 //  opencl-language-server
 //
-//  Created by is on 5.2.2023.
+//  Created by Ilia Shoshin on 5.2.2023.
 //
 
 #include "clinfo.hpp"
@@ -475,6 +475,45 @@ public:
         return nlohmann::json {{"PLATFORMS", jsonPlatforms}};
     }
 
+    std::vector<cl::Platform> GetPlatforms()
+    {
+        std::vector<cl::Platform> platforms;
+        try
+        {
+            cl::Platform::get(&platforms);
+            spdlog::get(logger)->info("Found OpenCL platforms: {}", platforms.size());
+        }
+        catch (cl::Error& err)
+        {
+            spdlog::get(logger)->error("No OpenCL platforms were found, {}", err.what());
+        }
+        return platforms;
+    }
+
+    std::vector<cl::Device> GetDevices()
+    {
+        std::vector<cl::Device> devices;
+        const auto platforms = GetPlatforms();
+        for (const auto& platform : platforms)
+        {
+            try
+            {
+                std::vector<cl::Device> platformDevices;
+                platform.getDevices(CL_DEVICE_TYPE_ALL, &platformDevices);
+                spdlog::get(logger)->info("Found OpenCL devices: {}", platformDevices.size());
+                devices.insert(
+                    devices.end(),
+                    std::make_move_iterator(platformDevices.begin()),
+                    std::make_move_iterator(platformDevices.end()));
+            }
+            catch (cl::Error& err)
+            {
+                spdlog::get(logger)->error("No OpenCL devices were found, {}", err.what());
+            }
+        }
+        return devices;
+    }
+
     uint32_t GetDeviceID(const cl::Device& device)
     {
         return CalculateDeviceID(device);
@@ -482,16 +521,39 @@ public:
 
     std::string GetDeviceDescription(const cl::Device& device)
     {
-        auto name = device.getInfo<CL_DEVICE_NAME>();
-        auto type = device.getInfo<CL_DEVICE_TYPE>();
-        auto version = device.getInfo<CL_DEVICE_VERSION>();
-        auto vendor = device.getInfo<CL_DEVICE_VENDOR>();
-        auto vendorID = device.getInfo<CL_DEVICE_VENDOR_ID>();
-        auto driverVersion = device.getInfo<CL_DRIVER_VERSION>();
-        auto description = "name: " + std::move(name) + "; " + "type: " + std::to_string(type) + "; " +
-            "version: " + std::move(version) + "; " + "vendor: " + std::move(vendor) + "; " +
-            "vendorID: " + std::to_string(vendorID) + "; " + "driverVersion: " + std::move(driverVersion);
-        return description;
+        try
+        {
+            auto name = device.getInfo<CL_DEVICE_NAME>();
+            auto type = device.getInfo<CL_DEVICE_TYPE>();
+            auto version = device.getInfo<CL_DEVICE_VERSION>();
+            auto vendor = device.getInfo<CL_DEVICE_VENDOR>();
+            auto vendorID = device.getInfo<CL_DEVICE_VENDOR_ID>();
+            auto driverVersion = device.getInfo<CL_DRIVER_VERSION>();
+            auto description = "name: " + std::move(name) + "; " + "type: " + std::to_string(type) + "; " +
+                "version: " + std::move(version) + "; " + "vendor: " + std::move(vendor) + "; " +
+                "vendorID: " + std::to_string(vendorID) + "; " + "driverVersion: " + std::move(driverVersion);
+            return description;
+        }
+        catch (cl::Error& err)
+        {
+            spdlog::get(logger)->error("Failed to get description for the selected device, {}", err.what());
+        }
+        return "unknown";
+    }
+
+    size_t GetDevicePowerIndex(const cl::Device& device)
+    {
+        try
+        {
+            const size_t maxComputeUnits = device.getInfo<CL_DEVICE_MAX_COMPUTE_UNITS>();
+            const size_t maxClockFrequency = device.getInfo<CL_DEVICE_MAX_CLOCK_FREQUENCY>();
+            return maxComputeUnits * maxClockFrequency;
+        }
+        catch (const cl::Error& err)
+        {
+            spdlog::get(logger)->error("Failed to get power index for the device, {}", err.what());
+        }
+        return 0;
     }
 };
 

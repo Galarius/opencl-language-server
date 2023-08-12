@@ -2,7 +2,7 @@
 //  diagnostics.cpp
 //  opencl-language-server
 //
-//  Created by Ilya Shoshin (Galarius) on 7/16/21.
+//  Created by Ilia Shoshin on 7/16/21.
 //
 
 #include "diagnostics.hpp"
@@ -46,13 +46,6 @@ std::tuple<std::string, long, long, long, std::string> ParseOutput(const std::sm
     return std::make_tuple(std::move(source), line, col, severity, std::move(message));
 }
 
-size_t GetDevicePowerIndex(const cl::Device& device)
-{
-    const size_t maxComputeUnits = device.getInfo<CL_DEVICE_MAX_COMPUTE_UNITS>();
-    const size_t maxClockFrequency = device.getInfo<CL_DEVICE_MAX_CLOCK_FREQUENCY>();
-    return maxComputeUnits * maxClockFrequency;
-}
-
 } // namespace
 
 namespace ocls {
@@ -70,6 +63,8 @@ public:
     nlohmann::json GetDiagnostics(const Source& source);
 
 private:
+    std::optional<cl::Device> SelectOpenCLDevice(const std::vector<cl::Device>& devices, uint32_t identifier);
+    std::optional<cl::Device> SelectOpenCLDeviceByPowerIndex(const std::vector<cl::Device>& devices);
     nlohmann::json BuildDiagnostics(const std::string& buildLog, const std::string& name);
     std::string BuildSource(const std::string& source) const;
 
@@ -86,78 +81,76 @@ Diagnostics::Diagnostics(std::shared_ptr<ICLInfo> clInfo) : m_clInfo {std::move(
     SetOpenCLDevice(0);
 }
 
-void Diagnostics::SetOpenCLDevice(uint32_t identifier)
+std::optional<cl::Device> Diagnostics::SelectOpenCLDeviceByPowerIndex(const std::vector<cl::Device>& devices)
 {
-    spdlog::get(logger)->trace("Selecting OpenCL platform...");
-    std::vector<cl::Platform> platforms;
-    try
+    auto maxIt = std::max_element(devices.begin(), devices.end(), [this](const cl::Device& a, const cl::Device& b) {
+        const auto powerIndexA = m_clInfo->GetDevicePowerIndex(a);
+        const auto powerIndexB = m_clInfo->GetDevicePowerIndex(b);
+        return powerIndexA < powerIndexB;
+    });
+
+    if (maxIt == devices.end())
     {
-        cl::Platform::get(&platforms);
-    }
-    catch (cl::Error& err)
-    {
-        spdlog::get(logger)->error("No OpenCL platforms were found, {}", err.what());
+        return std::nullopt;
     }
 
-    spdlog::get(logger)->info("Found OpenCL platforms: {}", platforms.size());
-    if (platforms.size() == 0)
+    return *maxIt;
+}
+
+std::optional<cl::Device> Diagnostics::SelectOpenCLDevice(const std::vector<cl::Device>& devices, uint32_t identifier)
+{
+    auto log = spdlog::get(logger);
+    std::optional<cl::Device> selectedDevice;
+
+    // Find device by identifier
+    auto it = std::find_if(devices.begin(), devices.end(), [this, &identifier](const cl::Device& device) {
+        try
+        {
+            return m_clInfo->GetDeviceID(device) == identifier;
+        }
+        catch (const cl::Error&)
+        {
+            return false;
+        }
+    });
+
+    if (it != devices.end())
+    {
+        return *it;
+    }
+
+    // If device is not found by identifier, then find the device based on power index
+    auto device = SelectOpenCLDeviceByPowerIndex(devices);
+    if (device && (!m_device || m_clInfo->GetDevicePowerIndex(*device) > m_clInfo->GetDevicePowerIndex(*m_device)))
+    {
+        selectedDevice = device;
+    }
+
+    return selectedDevice;
+}
+
+void Diagnostics::SetOpenCLDevice(uint32_t identifier)
+{
+    auto log = spdlog::get(logger);
+    log->trace("Selecting OpenCL device...");
+
+    const auto devices = m_clInfo->GetDevices();
+
+    if (devices.size() == 0)
     {
         return;
     }
 
-    std::string description;
-    std::optional<cl::Device> selectedDevice;
-    for (auto& platform : platforms)
+    m_device = SelectOpenCLDevice(devices, identifier);
+
+    if (!m_device)
     {
-        std::vector<cl::Device> devices;
-        try
-        {
-            platform.getDevices(CL_DEVICE_TYPE_ALL, &devices);
-        }
-        catch (cl::Error& err)
-        {
-            spdlog::get(logger)->error("No OpenCL devices were found, {}", err.what());
-        }
-        spdlog::get(logger)->info("Found OpenCL devices: {}", devices.size());
-        if (devices.size() == 0)
-        {
-            continue;
-        }
-
-        size_t maxPowerIndex = 0;
-        spdlog::get(logger)->trace("Selecting OpenCL device (total: {})...", devices.size());
-        for (auto& device : devices)
-        {
-            size_t powerIndex = 0;
-            try
-            {
-                description = m_clInfo->GetDeviceDescription(device);
-                auto deviceID = m_clInfo->GetDeviceID(device);
-                if (identifier == deviceID)
-                {
-                    selectedDevice = device;
-                    break;
-                }
-                else
-                {
-                    powerIndex = GetDevicePowerIndex(device);
-                }
-            }
-            catch (cl::Error& err)
-            {
-                spdlog::get(logger)->error("Failed to get info for a device, {}", err.what());
-                continue;
-            }
-
-            if (powerIndex > maxPowerIndex)
-            {
-                maxPowerIndex = powerIndex;
-                selectedDevice = device;
-            }
-        }
+        log->warn("No suitable OpenCL device was found.");
+        return;
     }
-    m_device = selectedDevice;
-    spdlog::get(logger)->info("Selected OpenCL device: {}", description);
+
+    auto description = m_clInfo->GetDeviceDescription(*m_device);
+    log->info("Selected OpenCL device: {}", description);
 }
 
 std::string Diagnostics::BuildSource(const std::string& source) const
@@ -180,7 +173,8 @@ std::string Diagnostics::BuildSource(const std::string& source) const
     {
         if (err.err() != CL_BUILD_PROGRAM_FAILURE)
         {
-            spdlog::get(logger)->error("Failed to build program, error, {}", err.what());
+            spdlog::get(logger)->error("Failed to build program: {} ({})", err.what(), err.err());
+            throw err;
         }
     }
 
