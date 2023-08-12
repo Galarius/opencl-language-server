@@ -2,7 +2,7 @@
 //  diagnostics.hpp
 //  opencl-language-server
 //
-//  Created by Ilya Shoshin (Galarius) on 7/16/21.
+//  Created by Ilia Shoshin on 7/16/21.
 //
 
 #pragma once
