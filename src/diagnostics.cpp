@@ -13,10 +13,9 @@
 #include <filesystem>
 #include <iostream>
 #include <optional>
-#include <regex>
 #include <spdlog/spdlog.h>
 #include <stdexcept> // std::runtime_error, std::invalid_argument
-#include <tuple>
+#include <sstream>
 
 using namespace nlohmann;
 
@@ -24,36 +23,81 @@ namespace {
 
 constexpr char logger[] = "diagnostics";
 
-int ParseSeverity(const std::string& severity)
-{
-    if (severity == "error")
-        return 1;
-    else if (severity == "warning")
-        return 2;
-    else
-        return -1;
-}
-
-// <program source>:13:5: warning: no previous prototype for function 'getChannel'
-std::tuple<std::string, long, long, long, std::string> ParseOutput(const std::smatch& matches)
-{
-    std::string source = matches[1];
-    const long line = std::stoi(matches[2]) - 1; // LSP assumes 0-indexed lines
-    const long col = std::stoi(matches[3]);
-    const int severity = ParseSeverity(matches[4]);
-    // matches[5] - 'fatal'
-    std::string message = matches[6];
-    return std::make_tuple(std::move(source), line, col, severity, std::move(message));
-}
-
 } // namespace
 
 namespace ocls {
 
+// - DiagnosticsParser
+
+class DiagnosticsParser final : public IDiagnosticsParser
+{
+    std::regex m_regex {"^(.*):(\\d+):(\\d+): ((fatal )?error|warning|Scholar): (.*)$"};
+
+public:
+    int ParseSeverity(const std::string& severity)
+    {
+        if (severity == "warning")
+        {
+            return 2;
+        }
+        else if (utils::EndsWith(severity, "error"))
+        {
+            return 1;
+        }
+        return -1;
+    }
+
+    // example input: <program source>:13:5: warning: no previous prototype for function 'getChannel'
+    std::tuple<std::string, long, long, long, std::string> ParseMatch(const std::smatch& matches)
+    {
+        std::string source = matches[1];
+        const long line = std::stoi(matches[2]) - 1; // LSP assumes 0-indexed lines
+        const long col = std::stoi(matches[3]);
+        const int severity = ParseSeverity(matches[4]);
+        // matches[5] - 'fatal '
+        std::string message = matches[6];
+        return std::make_tuple(std::move(source), line, col, severity, std::move(message));
+    }
+
+    nlohmann::json CreateDiagnostic(const std::smatch& matches, const std::string& name)
+    {
+        auto [source, line, col, severity, message] = ParseMatch(matches);
+        return {
+            {"source", name.empty() ? source : name},
+            {"range", {{"start", {{"line", line}, {"character", col}}}, {"end", {{"line", line}, {"character", col}}}}},
+            {"severity", severity},
+            {"message", message}};
+    }
+
+    nlohmann::json ParseDiagnostics(const std::string& buildLog, const std::string& name, uint64_t problemsLimit)
+    {
+        nlohmann::json diagnostics;
+        std::istringstream stream(buildLog);
+        std::string errLine;
+        uint64_t count = 0;
+        std::smatch matches;
+        while (std::getline(stream, errLine))
+        {
+            if (std::regex_search(errLine, matches, m_regex) && matches.size() == 7)
+            {
+                if (count++ >= problemsLimit)
+                {
+                    spdlog::get(logger)->info("Maximum number of problems reached, other problems will be skipped");
+                    break;
+                }
+                diagnostics.emplace_back(CreateDiagnostic(matches, name));
+            }
+        }
+        return diagnostics;
+    }
+};
+
+// - Diagnostics
+
 class Diagnostics final : public IDiagnostics
 {
 public:
-    explicit Diagnostics(std::shared_ptr<ICLInfo> clInfo);
+    Diagnostics(std::shared_ptr<ICLInfo> clInfo, std::shared_ptr<IDiagnosticsParser> parser);
 
     void SetBuildOptions(const nlohmann::json& options);
     void SetBuildOptions(const std::string& options);
@@ -65,18 +109,19 @@ public:
 private:
     std::optional<cl::Device> SelectOpenCLDevice(const std::vector<cl::Device>& devices, uint32_t identifier);
     std::optional<cl::Device> SelectOpenCLDeviceByPowerIndex(const std::vector<cl::Device>& devices);
-    nlohmann::json BuildDiagnostics(const std::string& buildLog, const std::string& name);
     std::string BuildSource(const std::string& source) const;
 
 private:
     std::shared_ptr<ICLInfo> m_clInfo;
+    std::shared_ptr<IDiagnosticsParser> m_parser;
     std::optional<cl::Device> m_device;
-    std::regex m_regex {"^(.*):(\\d+):(\\d+): ((fatal )?error|warning|Scholar): (.*)$"};
     std::string m_BuildOptions;
     uint64_t m_maxNumberOfProblems = INT8_MAX;
 };
 
-Diagnostics::Diagnostics(std::shared_ptr<ICLInfo> clInfo) : m_clInfo {std::move(clInfo)}
+Diagnostics::Diagnostics(std::shared_ptr<ICLInfo> clInfo, std::shared_ptr<IDiagnosticsParser> parser)
+    : m_clInfo {std::move(clInfo)}
+    , m_parser {std::move(parser)}
 {
     SetOpenCLDevice(0);
 }
@@ -192,47 +237,6 @@ std::string Diagnostics::BuildSource(const std::string& source) const
     return build_log;
 }
 
-nlohmann::json Diagnostics::BuildDiagnostics(const std::string& buildLog, const std::string& name)
-{
-    std::smatch matches;
-    auto errorLines = utils::SplitString(buildLog, "\n");
-    json diagnostics;
-    uint64_t count = 0;
-    for (auto errLine : errorLines)
-    {
-        std::regex_search(errLine, matches, m_regex);
-        if (matches.size() != 7)
-            continue;
-
-        if (count++ > m_maxNumberOfProblems)
-        {
-            spdlog::get(logger)->info("Maximum number of problems reached, other problems will be slipped");
-            break;
-        }
-
-        auto [source, line, col, severity, message] = ParseOutput(matches);
-        json diagnostic;
-        json range {
-            {"start",
-             {
-                 {"line", line},
-                 {"character", col},
-             }},
-            {"end",
-             {
-                 {"line", line},
-                 {"character", col},
-             }},
-        };
-        diagnostic["source"] = name.empty() ? source : name;
-        diagnostic["range"] = range;
-        diagnostic["severity"] = severity;
-        diagnostic["message"] = message;
-        diagnostics.emplace_back(diagnostic);
-    }
-    return diagnostics;
-}
-
 std::string Diagnostics::GetBuildLog(const Source& source)
 {
     if (!m_device.has_value())
@@ -254,7 +258,7 @@ nlohmann::json Diagnostics::GetDiagnostics(const Source& source)
     }
     buildLog = BuildSource(source.text);
     spdlog::get(logger)->trace("BuildLog:\n{}", buildLog);
-    return BuildDiagnostics(buildLog, srcName);
+    return m_parser->ParseDiagnostics(buildLog, srcName, m_maxNumberOfProblems);
 }
 
 void Diagnostics::SetBuildOptions(const json& options)
@@ -283,9 +287,20 @@ void Diagnostics::SetMaxProblemsCount(uint64_t maxNumberOfProblems)
     m_maxNumberOfProblems = maxNumberOfProblems;
 }
 
+std::shared_ptr<IDiagnosticsParser> CreateDiagnosticsParser()
+{
+    return std::make_shared<DiagnosticsParser>();
+}
+
 std::shared_ptr<IDiagnostics> CreateDiagnostics(std::shared_ptr<ICLInfo> clInfo)
 {
-    return std::make_shared<Diagnostics>(std::move(clInfo));
+    return std::make_shared<Diagnostics>(std::move(clInfo), CreateDiagnosticsParser());
+}
+
+std::shared_ptr<IDiagnostics> CreateDiagnostics(
+    std::shared_ptr<ICLInfo> clInfo, std::shared_ptr<IDiagnosticsParser> parser)
+{
+    return std::make_shared<Diagnostics>(std::move(clInfo), parser);
 }
 
 } // namespace ocls
