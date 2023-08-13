@@ -12,6 +12,8 @@
 #include <memory>
 #include <nlohmann/json.hpp>
 #include <string>
+#include <regex>
+#include <tuple>
 
 namespace ocls {
 
@@ -24,6 +26,15 @@ struct Source
     {
         return filePath == other.filePath && text == other.text;
     }
+};
+
+struct IDiagnosticsParser
+{
+    virtual ~IDiagnosticsParser() = default;
+
+    virtual std::tuple<std::string, long, long, long, std::string> ParseMatch(const std::smatch& matches) = 0;
+    virtual nlohmann::json ParseDiagnostics(
+        const std::string& buildLog, const std::string& name, uint64_t problemsLimit) = 0;
 };
 
 struct IDiagnostics
@@ -39,6 +50,9 @@ struct IDiagnostics
     virtual nlohmann::json GetDiagnostics(const Source& source) = 0;
 };
 
+std::shared_ptr<IDiagnosticsParser> CreateDiagnosticsParser();
 std::shared_ptr<IDiagnostics> CreateDiagnostics(std::shared_ptr<ICLInfo> clInfo);
+std::shared_ptr<IDiagnostics> CreateDiagnostics(
+    std::shared_ptr<ICLInfo> clInfo, std::shared_ptr<IDiagnosticsParser> parser);
 
 } // namespace ocls
