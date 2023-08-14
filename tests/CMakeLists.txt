@@ -9,6 +9,7 @@ list(TRANSFORM sources PREPEND "${PROJECT_SOURCE_DIR}/src/")
 set(test_sources
     jsonrpc-tests.cpp
     diagnostics-parser-tests.cpp
+    diagnostics-tests.cpp
     lsp-event-handler-tests.cpp
     main.cpp
 )
