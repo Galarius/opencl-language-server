@@ -126,6 +126,84 @@ Diagnostics::Diagnostics(std::shared_ptr<ICLInfo> clInfo, std::shared_ptr<IDiagn
     SetOpenCLDevice(0);
 }
 
+// - IDiagnostics
+
+void Diagnostics::SetBuildOptions(const json& options)
+{
+    try
+    {
+        auto concat = [](const std::string& acc, const json& j) { return acc + j.get<std::string>() + " "; };
+        auto opts = std::accumulate(options.begin(), options.end(), std::string(), concat);
+        SetBuildOptions(opts);
+    }
+    catch (std::exception& e)
+    {
+        spdlog::get(logger)->error("Failed to parse build options, {}", e.what());
+    }
+}
+
+void Diagnostics::SetBuildOptions(const std::string& options)
+{
+    m_BuildOptions = options;
+    spdlog::get(logger)->trace("Set build options, {}", m_BuildOptions);
+}
+
+void Diagnostics::SetMaxProblemsCount(uint64_t maxNumberOfProblems)
+{
+    spdlog::get(logger)->trace("Set max number of problems: {}", maxNumberOfProblems);
+    m_maxNumberOfProblems = maxNumberOfProblems;
+}
+
+void Diagnostics::SetOpenCLDevice(uint32_t identifier)
+{
+    auto log = spdlog::get(logger);
+    log->trace("Selecting OpenCL device...");
+
+    const auto devices = m_clInfo->GetDevices();
+
+    if (devices.size() == 0)
+    {
+        return;
+    }
+
+    auto selectedDevice = SelectOpenCLDevice(devices, identifier);
+    if (!selectedDevice)
+    {
+        log->warn("No suitable OpenCL device was found.");
+        return;
+    }
+
+    m_device = selectedDevice;
+    auto description = m_clInfo->GetDeviceDescription(*m_device);
+    log->info("Selected OpenCL device: {}", description);
+}
+
+std::string Diagnostics::GetBuildLog(const Source& source)
+{
+    if (!m_device.has_value())
+    {
+        throw std::runtime_error("missing OpenCL device");
+    }
+    spdlog::get(logger)->trace("Getting diagnostics...");
+    return BuildSource(source.text);
+}
+
+nlohmann::json Diagnostics::GetDiagnostics(const Source& source)
+{
+    std::string buildLog = GetBuildLog(source);
+    std::string srcName;
+    if (!source.filePath.empty())
+    {
+        auto filePath = std::filesystem::path(source.filePath).string();
+        srcName = std::filesystem::path(filePath).filename().string();
+    }
+    buildLog = BuildSource(source.text);
+    spdlog::get(logger)->trace("BuildLog:\n{}", buildLog);
+    return m_parser->ParseDiagnostics(buildLog, srcName, m_maxNumberOfProblems);
+}
+
+// -
+
 std::optional<cl::Device> Diagnostics::SelectOpenCLDeviceByPowerIndex(const std::vector<cl::Device>& devices)
 {
     auto maxIt = std::max_element(devices.begin(), devices.end(), [this](const cl::Device& a, const cl::Device& b) {
@@ -145,57 +223,34 @@ std::optional<cl::Device> Diagnostics::SelectOpenCLDeviceByPowerIndex(const std:
 std::optional<cl::Device> Diagnostics::SelectOpenCLDevice(const std::vector<cl::Device>& devices, uint32_t identifier)
 {
     auto log = spdlog::get(logger);
-    std::optional<cl::Device> selectedDevice;
 
-    // Find device by identifier
-    auto it = std::find_if(devices.begin(), devices.end(), [this, &identifier](const cl::Device& device) {
-        try
-        {
-            return m_clInfo->GetDeviceID(device) == identifier;
-        }
-        catch (const cl::Error&)
-        {
-            return false;
-        }
-    });
-
-    if (it != devices.end())
+    if (identifier > 0)
     {
-        return *it;
+        auto it = std::find_if(devices.begin(), devices.end(), [this, &identifier](const cl::Device& device) {
+            try
+            {
+                return m_clInfo->GetDeviceID(device) == identifier;
+            }
+            catch (const cl::Error&)
+            {
+                return false;
+            }
+        });
+
+        if (it != devices.end())
+        {
+            return *it;
+        }
     }
 
     // If device is not found by identifier, then find the device based on power index
     auto device = SelectOpenCLDeviceByPowerIndex(devices);
     if (device && (!m_device || m_clInfo->GetDevicePowerIndex(*device) > m_clInfo->GetDevicePowerIndex(*m_device)))
     {
-        selectedDevice = device;
+        return device;
     }
 
-    return selectedDevice;
-}
-
-void Diagnostics::SetOpenCLDevice(uint32_t identifier)
-{
-    auto log = spdlog::get(logger);
-    log->trace("Selecting OpenCL device...");
-
-    const auto devices = m_clInfo->GetDevices();
-
-    if (devices.size() == 0)
-    {
-        return;
-    }
-
-    m_device = SelectOpenCLDevice(devices, identifier);
-
-    if (!m_device)
-    {
-        log->warn("No suitable OpenCL device was found.");
-        return;
-    }
-
-    auto description = m_clInfo->GetDeviceDescription(*m_device);
-    log->info("Selected OpenCL device: {}", description);
+    return std::nullopt;
 }
 
 std::string Diagnostics::BuildSource(const std::string& source) const
@@ -237,55 +292,7 @@ std::string Diagnostics::BuildSource(const std::string& source) const
     return build_log;
 }
 
-std::string Diagnostics::GetBuildLog(const Source& source)
-{
-    if (!m_device.has_value())
-    {
-        throw std::runtime_error("missing OpenCL device");
-    }
-    spdlog::get(logger)->trace("Getting diagnostics...");
-    return BuildSource(source.text);
-}
-
-nlohmann::json Diagnostics::GetDiagnostics(const Source& source)
-{
-    std::string buildLog = GetBuildLog(source);
-    std::string srcName;
-    if (!source.filePath.empty())
-    {
-        auto filePath = std::filesystem::path(source.filePath).string();
-        srcName = std::filesystem::path(filePath).filename().string();
-    }
-    buildLog = BuildSource(source.text);
-    spdlog::get(logger)->trace("BuildLog:\n{}", buildLog);
-    return m_parser->ParseDiagnostics(buildLog, srcName, m_maxNumberOfProblems);
-}
-
-void Diagnostics::SetBuildOptions(const json& options)
-{
-    try
-    {
-        auto concat = [](const std::string& acc, const json& j) { return acc + j.get<std::string>() + " "; };
-        auto opts = std::accumulate(options.begin(), options.end(), std::string(), concat);
-        SetBuildOptions(opts);
-    }
-    catch (std::exception& e)
-    {
-        spdlog::get(logger)->error("Failed to parse build options, {}", e.what());
-    }
-}
-
-void Diagnostics::SetBuildOptions(const std::string& options)
-{
-    m_BuildOptions = options;
-    spdlog::get(logger)->trace("Set build options, {}", m_BuildOptions);
-}
-
-void Diagnostics::SetMaxProblemsCount(uint64_t maxNumberOfProblems)
-{
-    spdlog::get(logger)->trace("Set max number of problems: {}", maxNumberOfProblems);
-    m_maxNumberOfProblems = maxNumberOfProblems;
-}
+// -
 
 std::shared_ptr<IDiagnosticsParser> CreateDiagnosticsParser()
 {
