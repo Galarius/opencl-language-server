@@ -2,7 +2,7 @@
 //  utils.hpp
 //  opencl-language-server
 //
-//  Created by Ilya Shoshin (Galarius) on 7/21/21.
+//  Created by Ilia Shoshin on 7/21/21.
 //
 
 #pragma once
@@ -35,11 +35,23 @@ std::shared_ptr<IGenerator> CreateDefaultGenerator();
 
 std::shared_ptr<IExitHandler> CreateDefaultExitHandler();
 
-void Trim(std::string& s);
+// --- String Helpers ---
+
 std::vector<std::string> SplitString(const std::string& str, const std::string& pattern);
-std::string UriToFilePath(const std::string& uri);
+
+void Trim(std::string& s);
+
 bool EndsWith(const std::string& str, const std::string& suffix);
+
+// --- File Helpers ---
+
+std::string UriToFilePath(const std::string& uri, bool unix);
+
+std::string UriToFilePath(const std::string& uri);
+
 std::optional<std::string> ReadFileContent(std::string_view fileName);
+
+// --- CRC32 ---
 
 namespace internal {
 // Generates a lookup table for the checksums of all 8-bit values.
