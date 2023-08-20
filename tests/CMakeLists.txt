@@ -11,6 +11,7 @@ set(test_sources
     diagnostics-parser-tests.cpp
     diagnostics-tests.cpp
     lsp-event-handler-tests.cpp
+    utils-tests.cpp
     main.cpp
 )
 set(libs GTest::gmock nlohmann_json::nlohmann_json spdlog::spdlog OpenCL::HeadersCpp uriparser::uriparser)

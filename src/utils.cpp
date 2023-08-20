@@ -2,7 +2,7 @@
 //  utils.cpp
 //  opencl-language-server
 //
-//  Created by Ilya Shoshin (Galarius) on 7/21/21.
+//  Created by Ilia Shoshin on 7/21/21.
 //
 
 #include "utils.hpp"
@@ -19,6 +19,8 @@
 #include <uriparser/Uri.h>
 
 namespace ocls::utils {
+
+// --- DefaultGenerator ---
 
 class DefaultGenerator final : public IGenerator
 {
@@ -47,6 +49,8 @@ std::shared_ptr<IGenerator> CreateDefaultGenerator()
     return std::make_shared<DefaultGenerator>();
 }
 
+// --- DefaultExitHandler ---
+
 class DefaultExitHandler final : public IExitHandler
 {
 public:
@@ -63,6 +67,23 @@ std::shared_ptr<IExitHandler> CreateDefaultExitHandler()
     return std::make_shared<DefaultExitHandler>();
 }
 
+// --- String Helpers ---
+
+std::vector<std::string> SplitString(const std::string& str, const std::string& pattern)
+{
+    if (pattern.empty())
+    {
+        return {str};
+    }
+    std::vector<std::string> result;
+    const std::regex re(pattern);
+    std::sregex_token_iterator iter(str.begin(), str.end(), re, -1);
+    for (std::sregex_token_iterator end; iter != end; ++iter)
+    {
+        result.push_back(iter->str());
+    }
+    return result;
+}
 
 void Trim(std::string& s)
 {
@@ -70,41 +91,45 @@ void Trim(std::string& s)
     s.erase(std::find_if(s.rbegin(), s.rend(), [](unsigned char ch) { return !std::isspace(ch); }).base(), s.end());
 }
 
-std::vector<std::string> SplitString(const std::string& str, const std::string& pattern)
+bool EndsWith(const std::string& str, const std::string& suffix)
 {
-    std::vector<std::string> result;
-    const std::regex re(pattern);
-    std::sregex_token_iterator iter(str.begin(), str.end(), re, -1);
-    for (std::sregex_token_iterator end; iter != end; ++iter)
-        result.push_back(iter->str());
-    return result;
+    return str.size() >= suffix.size() && 0 == str.compare(str.size() - suffix.size(), suffix.size(), suffix);
 }
 
-std::string UriToFilePath(const std::string& uri)
+// --- File Helpers ---
+
+std::string UriToFilePath(const std::string& uri, bool unix)
 {
     const size_t bytesNeeded = 8 + 3 * uri.length() + 1;
     char* fileName = (char*)malloc(bytesNeeded * sizeof(char));
-#if defined(WIN32)
-    if (uriUriStringToWindowsFilenameA(uri.c_str(), fileName) != URI_SUCCESS)
+    if (unix)
     {
-        free(fileName);
-        throw std::runtime_error("Failed to convert URI to Windows filename.");
+        if (uriUriStringToUnixFilenameA(uri.c_str(), fileName) != URI_SUCCESS)
+        {
+            free(fileName);
+            throw std::runtime_error("Failed to convert URI to Unix filename.");
+        }
     }
-#else
-    if (uriUriStringToUnixFilenameA(uri.c_str(), fileName) != URI_SUCCESS)
+    else
     {
-        free(fileName);
-        throw std::runtime_error("Failed to convert URI to Unix filename.");
+        if (uriUriStringToWindowsFilenameA(uri.c_str(), fileName) != URI_SUCCESS)
+        {
+            free(fileName);
+            throw std::runtime_error("Failed to convert URI to Windows filename.");
+        }
     }
-#endif
     std::string result(fileName);
     free(fileName);
     return result;
 }
 
-bool EndsWith(const std::string& str, const std::string& suffix)
+std::string UriToFilePath(const std::string& uri)
 {
-    return str.size() >= suffix.size() && 0 == str.compare(str.size() - suffix.size(), suffix.size(), suffix);
+#if defined(WIN32)
+    return UriToFilePath(uri, false);
+#else
+    return UriToFilePath(uri, true);
+#endif
 }
 
 std::optional<std::string> ReadFileContent(std::string_view fileName)
@@ -126,6 +151,8 @@ std::optional<std::string> ReadFileContent(std::string_view fileName)
     return content;
 }
 
+// --- CRC32 ---
+
 namespace internal {
 // Generates a lookup table for the checksums of all 8-bit values.
 std::array<std::uint_fast32_t, 256> GenerateCRCLookupTable()
@@ -139,10 +166,10 @@ std::array<std::uint_fast32_t, 256> GenerateCRCLookupTable()
         std::uint_fast32_t operator()() noexcept
         {
             auto checksum = static_cast<std::uint_fast32_t>(n++);
-
             for (auto i = 0; i < 8; ++i)
+            {
                 checksum = (checksum >> 1) ^ ((checksum & 0x1u) ? reversed_polynomial : 0);
-
+            }
             return checksum;
         }
 
