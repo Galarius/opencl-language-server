@@ -6,10 +6,10 @@
 //
 
 #include "clinfo.hpp"
+#include "log.hpp"
 #include "utils.hpp"
 
 #include <array>
-#include <spdlog/spdlog.h>
 #include <unordered_map>
 
 using namespace nlohmann;
@@ -18,7 +18,7 @@ using ocls::ICLInfo;
 
 namespace {
 
-constexpr const char logger[] = "clinfo";
+auto logger() { return spdlog::get(ocls::LogName::clinfo); }
 
 const std::unordered_map<cl_bool, std::string> booleanChoices {
     {CL_TRUE, "CL_TRUE"},
@@ -350,7 +350,7 @@ json::object_t GetDeviceJSONInfo(const cl::Device& device)
         }
         catch (const cl::Error& err)
         {
-            spdlog::get(logger)->error("Failed to get info for the device, {}", err.what());
+            logger()->error("Failed to get info for the device, {}", err.what());
             continue;
         }
     }
@@ -373,7 +373,7 @@ uint32_t CalculateDeviceID(const cl::Device& device)
     }
     catch (const cl::Error& err)
     {
-        spdlog::get(logger)->error("Failed to calculate device uuid, {}", err.what());
+        logger()->error("Failed to calculate device uuid, {}", err.what());
     }
     return 0;
 }
@@ -403,7 +403,7 @@ uint32_t CalculatePlatformID(const cl::Platform& platform)
     }
     catch (const cl::Error& err)
     {
-        spdlog::get(logger)->error("Failed to calculate platform uuid, {}", err.what());
+        logger()->error("Failed to calculate platform uuid, {}", err.what());
     }
     return 0;
 }
@@ -421,7 +421,7 @@ json GetPlatformJSONInfo(const cl::Platform& platform)
         }
         catch (const cl::Error& err)
         {
-            spdlog::get(logger)->error("Failed to get info for a platform, {}", err.what());
+            logger()->error("Failed to get info for a platform, {}", err.what());
         }
     }
 
@@ -438,7 +438,7 @@ json GetPlatformJSONInfo(const cl::Platform& platform)
     }
     catch (const cl::Error& err)
     {
-        spdlog::get(logger)->error("Failed to get devices for a platform, {}", err.what());
+        logger()->error("Failed to get devices for a platform, {}", err.what());
     }
 
     return info;
@@ -449,7 +449,7 @@ class CLInfo final : public ICLInfo
 public:
     nlohmann::json json()
     {
-        spdlog::get(logger)->trace("Searching for OpenCL platforms...");
+        logger()->trace("Searching for OpenCL platforms...");
         std::vector<cl::Platform> platforms;
         try
         {
@@ -457,10 +457,10 @@ public:
         }
         catch (const cl::Error& err)
         {
-            spdlog::get(logger)->error("No OpenCL platforms were found ({})", err.what());
+            logger()->error("No OpenCL platforms were found ({})", err.what());
         }
 
-        spdlog::get(logger)->info("Found OpenCL platforms, {}", platforms.size());
+        logger()->info("Found OpenCL platforms, {}", platforms.size());
         if (platforms.size() == 0)
         {
             return {};
@@ -481,11 +481,11 @@ public:
         try
         {
             cl::Platform::get(&platforms);
-            spdlog::get(logger)->info("Found OpenCL platforms: {}", platforms.size());
+            logger()->info("Found OpenCL platforms: {}", platforms.size());
         }
         catch (cl::Error& err)
         {
-            spdlog::get(logger)->error("No OpenCL platforms were found, {}", err.what());
+            logger()->error("No OpenCL platforms were found, {}", err.what());
         }
         return platforms;
     }
@@ -500,7 +500,7 @@ public:
             {
                 std::vector<cl::Device> platformDevices;
                 platform.getDevices(CL_DEVICE_TYPE_ALL, &platformDevices);
-                spdlog::get(logger)->info("Found OpenCL devices: {}", platformDevices.size());
+                logger()->info("Found OpenCL devices: {}", platformDevices.size());
                 devices.insert(
                     devices.end(),
                     std::make_move_iterator(platformDevices.begin()),
@@ -508,7 +508,7 @@ public:
             }
             catch (cl::Error& err)
             {
-                spdlog::get(logger)->error("No OpenCL devices were found, {}", err.what());
+                logger()->error("No OpenCL devices were found, {}", err.what());
             }
         }
         return devices;
@@ -536,7 +536,7 @@ public:
         }
         catch (cl::Error& err)
         {
-            spdlog::get(logger)->error("Failed to get description for the selected device, {}", err.what());
+            logger()->error("Failed to get description for the selected device, {}", err.what());
         }
         return "unknown";
     }
@@ -551,7 +551,7 @@ public:
         }
         catch (const cl::Error& err)
         {
-            spdlog::get(logger)->error("Failed to get power index for the device, {}", err.what());
+            logger()->error("Failed to get power index for the device, {}", err.what());
         }
         return 0;
     }

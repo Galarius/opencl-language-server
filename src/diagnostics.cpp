@@ -6,6 +6,7 @@
 //
 
 #include "diagnostics.hpp"
+#include "log.hpp"
 #include "utils.hpp"
 
 #include <CL/opencl.hpp>
@@ -13,7 +14,6 @@
 #include <filesystem>
 #include <iostream>
 #include <optional>
-#include <spdlog/spdlog.h>
 #include <stdexcept> // std::runtime_error, std::invalid_argument
 #include <sstream>
 
@@ -21,7 +21,7 @@ using namespace nlohmann;
 
 namespace {
 
-constexpr char logger[] = "diagnostics";
+auto logger() { return spdlog::get(ocls::LogName::diagnostics); }
 
 } // namespace
 
@@ -82,7 +82,7 @@ public:
             {
                 if (count++ >= problemsLimit)
                 {
-                    spdlog::get(logger)->info("Maximum number of problems reached, other problems will be skipped");
+                    logger()->info("Maximum number of problems reached, other problems will be skipped");
                     break;
                 }
                 diagnostics.emplace_back(CreateDiagnostic(matches, name));
@@ -138,26 +138,25 @@ void Diagnostics::SetBuildOptions(const json& options)
     }
     catch (std::exception& e)
     {
-        spdlog::get(logger)->error("Failed to parse build options, {}", e.what());
+        logger()->error("Failed to parse build options, {}", e.what());
     }
 }
 
 void Diagnostics::SetBuildOptions(const std::string& options)
 {
     m_BuildOptions = options;
-    spdlog::get(logger)->trace("Set build options, {}", m_BuildOptions);
+    logger()->trace("Set build options, {}", m_BuildOptions);
 }
 
 void Diagnostics::SetMaxProblemsCount(uint64_t maxNumberOfProblems)
 {
-    spdlog::get(logger)->trace("Set max number of problems: {}", maxNumberOfProblems);
+    logger()->trace("Set max number of problems: {}", maxNumberOfProblems);
     m_maxNumberOfProblems = maxNumberOfProblems;
 }
 
 void Diagnostics::SetOpenCLDevice(uint32_t identifier)
 {
-    auto log = spdlog::get(logger);
-    log->trace("Selecting OpenCL device...");
+    logger()->trace("Selecting OpenCL device...");
 
     const auto devices = m_clInfo->GetDevices();
 
@@ -169,13 +168,13 @@ void Diagnostics::SetOpenCLDevice(uint32_t identifier)
     auto selectedDevice = SelectOpenCLDevice(devices, identifier);
     if (!selectedDevice)
     {
-        log->warn("No suitable OpenCL device was found.");
+        logger()->warn("No suitable OpenCL device was found.");
         return;
     }
 
     m_device = selectedDevice;
     auto description = m_clInfo->GetDeviceDescription(*m_device);
-    log->info("Selected OpenCL device: {}", description);
+    logger()->info("Selected OpenCL device: {}", description);
 }
 
 std::string Diagnostics::GetBuildLog(const Source& source)
@@ -184,7 +183,7 @@ std::string Diagnostics::GetBuildLog(const Source& source)
     {
         throw std::runtime_error("missing OpenCL device");
     }
-    spdlog::get(logger)->trace("Getting diagnostics...");
+    logger()->trace("Getting diagnostics...");
     return BuildSource(source.text);
 }
 
@@ -198,7 +197,7 @@ nlohmann::json Diagnostics::GetDiagnostics(const Source& source)
         srcName = std::filesystem::path(filePath).filename().string();
     }
     buildLog = BuildSource(source.text);
-    spdlog::get(logger)->trace("BuildLog:\n{}", buildLog);
+    logger()->trace("BuildLog:\n{}", buildLog);
     return m_parser->ParseDiagnostics(buildLog, srcName, m_maxNumberOfProblems);
 }
 
@@ -222,8 +221,6 @@ std::optional<cl::Device> Diagnostics::SelectOpenCLDeviceByPowerIndex(const std:
 
 std::optional<cl::Device> Diagnostics::SelectOpenCLDevice(const std::vector<cl::Device>& devices, uint32_t identifier)
 {
-    auto log = spdlog::get(logger);
-
     if (identifier > 0)
     {
         auto it = std::find_if(devices.begin(), devices.end(), [this, &identifier](const cl::Device& device) {
@@ -265,7 +262,7 @@ std::string Diagnostics::BuildSource(const std::string& source) const
     cl::Program program;
     try
     {
-        spdlog::get(logger)->debug("Building program with options: {}", m_BuildOptions);
+        logger()->debug("Building program with options: {}", m_BuildOptions);
         program = cl::Program(context, source, false);
         program.build(ds, m_BuildOptions.c_str());
     }
@@ -273,7 +270,7 @@ std::string Diagnostics::BuildSource(const std::string& source) const
     {
         if (err.err() != CL_BUILD_PROGRAM_FAILURE)
         {
-            spdlog::get(logger)->error("Failed to build program: {} ({})", err.what(), err.err());
+            logger()->error("Failed to build program: {} ({})", err.what(), err.err());
             throw err;
         }
     }
@@ -286,7 +283,7 @@ std::string Diagnostics::BuildSource(const std::string& source) const
     }
     catch (cl::Error& err)
     {
-        spdlog::get(logger)->error("Failed get build info, error, {}", err.what());
+        logger()->error("Failed get build info, error, {}", err.what());
     }
 
     return build_log;

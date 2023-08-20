@@ -43,6 +43,11 @@ void Trim(std::string& s);
 
 bool EndsWith(const std::string& str, const std::string& suffix);
 
+inline std::string FormatBool(bool flag)
+{
+    return flag ? "yes" : "no";
+}
+
 // --- File Helpers ---
 
 std::string UriToFilePath(const std::string& uri, bool unix);

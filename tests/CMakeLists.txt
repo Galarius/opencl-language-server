@@ -2,6 +2,7 @@ set(TESTS_PROJECT_NAME ${PROJECT_NAME}-tests)
 set(sources
     diagnostics.cpp
     jsonrpc.cpp
+    log.cpp
     lsp.cpp
     utils.cpp
 )

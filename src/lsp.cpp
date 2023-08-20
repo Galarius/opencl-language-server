@@ -5,13 +5,14 @@
 //  Created by Ilia Shoshin on 7/16/21.
 //
 
-#include "lsp.hpp"
 #include "diagnostics.hpp"
 #include "jsonrpc.hpp"
+#include "log.hpp"
+#include "lsp.hpp"
+#include "utils.hpp"
 
 #include <atomic>
 #include <iostream>
-#include <spdlog/spdlog.h>
 #include <queue>
 
 using namespace nlohmann;
@@ -41,7 +42,7 @@ std::optional<nlohmann::json> GetNestedValue(const nlohmann::json &j, const std:
 
 namespace ocls {
 
-constexpr char logger[] = "lsp";
+auto logger() { return spdlog::get(ocls::LogName::lsp); }
 
 struct Capabilities
 {
@@ -123,11 +124,11 @@ void LSPServerEventsHandler::GetConfiguration()
 {
     if (!m_capabilities.hasConfigurationCapability)
     {
-        spdlog::get(logger)->debug("Does not have configuration capability");
+        logger()->debug("Does not have configuration capability");
         return;
     }
 
-    spdlog::get(logger)->debug("Make configuration request");
+    logger()->debug("Make configuration request");
     json buildOptions = {{"section", "OpenCL.server.buildOptions"}};
     json maxNumberOfProblems = {{"section", "OpenCL.server.maxNumberOfProblems"}};
     json openCLDeviceID = {{"section", "OpenCL.server.deviceID"}};
@@ -153,10 +154,10 @@ std::optional<json> LSPServerEventsHandler::GetNextResponse()
 
 void LSPServerEventsHandler::OnInitialize(const json &data)
 {
-    spdlog::get(logger)->debug("Received 'initialize' request");
+    logger()->debug("Received 'initialize' request");
     if (!data.contains("id"))
     {
-        spdlog::get(logger)->error("'initialize' message does not contain 'id'");
+        logger()->error("'initialize' message does not contain 'id'");
         return;
     }
     auto requestId = data["id"];
@@ -210,10 +211,10 @@ void LSPServerEventsHandler::OnInitialize(const json &data)
 
 void LSPServerEventsHandler::OnInitialized(const json &data)
 {
-    spdlog::get(logger)->debug("Received 'initialized' message");
+    logger()->debug("Received 'initialized' message");
     if (!data.contains("id"))
     {
-        spdlog::get(logger)->error("'initialized' message does not contain 'id'");
+        logger()->error("'initialized' message does not contain 'id'");
         return;
     }
 
@@ -221,7 +222,7 @@ void LSPServerEventsHandler::OnInitialized(const json &data)
 
     if (!m_capabilities.supportDidChangeConfiguration)
     {
-        spdlog::get(logger)->debug("Does not support didChangeConfiguration registration");
+        logger()->debug("Does not support didChangeConfiguration registration");
         return;
     }
 
@@ -242,7 +243,7 @@ void LSPServerEventsHandler::BuildDiagnosticsRespond(const std::string &uri, con
     try
     {
         const auto filePath = utils::UriToFilePath(uri);
-        spdlog::get(logger)->debug("Converted uri '{}' to path '{}'", uri, filePath);
+        logger()->debug("Converted uri '{}' to path '{}'", uri, filePath);
 
         json diags = m_diagnostics->GetDiagnostics({filePath, content});
         m_outQueue.push(
@@ -256,14 +257,14 @@ void LSPServerEventsHandler::BuildDiagnosticsRespond(const std::string &uri, con
     catch (std::exception &err)
     {
         auto msg = std::string("Failed to get diagnostics: ") + err.what();
-        spdlog::get(logger)->error(msg);
+        logger()->error(msg);
         m_jrpc->WriteError(JRPCErrorCode::InternalError, msg);
     }
 }
 
 void LSPServerEventsHandler::OnTextOpen(const json &data)
 {
-    spdlog::get(logger)->debug("Received 'textOpen' message");
+    logger()->debug("Received 'textOpen' message");
     auto uri = GetNestedValue(data, {"params", "textDocument", "uri"});
     auto content = GetNestedValue(data, {"params", "textDocument", "text"});
     if (uri && content)
@@ -274,7 +275,7 @@ void LSPServerEventsHandler::OnTextOpen(const json &data)
 
 void LSPServerEventsHandler::OnTextChanged(const json &data)
 {
-    spdlog::get(logger)->debug("Received 'textChanged' message");
+    logger()->debug("Received 'textChanged' message");
     auto uri = GetNestedValue(data, {"params", "textDocument", "uri"});
     auto contentChanges = GetNestedValue(data, {"params", "contentChanges"});
     if (contentChanges && contentChanges->size() > 0)
@@ -292,21 +293,20 @@ void LSPServerEventsHandler::OnTextChanged(const json &data)
 
 void LSPServerEventsHandler::OnConfiguration(const json &data)
 {
-    auto log = spdlog::get(logger);
-    log->debug("Received 'configuration' respond");
+    logger()->debug("Received 'configuration' respond");
 
     try
     {
         auto result = data.at("result");
         if (result.empty())
         {
-            log->warn("Empty configuration");
+            logger()->warn("Empty configuration");
             return;
         }
 
         if (result.size() < NumConfigurations)
         {
-            log->warn("Unexpected number of options");
+            logger()->warn("Unexpected number of options");
             return;
         }
 
@@ -329,16 +329,16 @@ void LSPServerEventsHandler::OnConfiguration(const json &data)
     }
     catch (std::exception &err)
     {
-        log->error("Failed to update settings, {}", err.what());
+        logger()->error("Failed to update settings, {}", err.what());
     }
 }
 
 void LSPServerEventsHandler::OnRespond(const json &data)
 {
-    spdlog::get(logger)->debug("Received client respond");
+    logger()->debug("Received client respond");
     if (m_requests.empty())
     {
-        spdlog::get(logger)->warn("Unexpected respond {}", data.dump());
+        logger()->warn("Unexpected respond {}", data.dump());
         return;
     }
 
@@ -352,26 +352,26 @@ void LSPServerEventsHandler::OnRespond(const json &data)
         }
         else
         {
-            spdlog::get(logger)->warn("Out of order respond");
+            logger()->warn("Out of order respond");
         }
         m_requests.pop();
     }
     catch (std::exception &err)
     {
-        spdlog::get(logger)->error("OnRespond failed, {}", err.what());
+        logger()->error("OnRespond failed, {}", err.what());
     }
 }
 
 void LSPServerEventsHandler::OnShutdown(const json &data)
 {
-    spdlog::get(logger)->debug("Received 'shutdown' request");
+    logger()->debug("Received 'shutdown' request");
     m_outQueue.push({{"id", data["id"]}, {"result", nullptr}});
     m_shutdown = true;
 }
 
 void LSPServerEventsHandler::OnExit()
 {
-    spdlog::get(logger)->debug("Received 'exit', after 'shutdown': {}", m_shutdown ? "yes" : "no");
+    logger()->debug("Received 'exit', after 'shutdown': {}", utils::FormatBool(m_shutdown));
     if (m_shutdown)
     {
         m_exitHandler->OnExit(EXIT_SUCCESS);
@@ -386,7 +386,7 @@ void LSPServerEventsHandler::OnExit()
 
 int LSPServer::Run()
 {
-    spdlog::get(logger)->info("Setting up...");
+    logger()->info("Setting up...");
     auto self = this->shared_from_this();
     // clang-format off
     // Register handlers for methods
@@ -435,7 +435,7 @@ int LSPServer::Run()
     });
     // clang-format on
 
-    spdlog::get(logger)->info("Listening...");
+    logger()->info("Listening...");
     char c;
     while (std::cin.get(c))
     {
