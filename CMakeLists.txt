@@ -60,6 +60,7 @@ set(headers
     clinfo.hpp
     diagnostics.hpp
     jsonrpc.hpp
+    log.hpp
     lsp.hpp
     utils.hpp
 )
@@ -67,6 +68,7 @@ set(sources
     clinfo.cpp
     diagnostics.cpp
     jsonrpc.cpp
+    log.cpp
     lsp.cpp
     main.cpp
     utils.cpp

@@ -10,15 +10,13 @@
 #include "clinfo.hpp"
 #include "diagnostics.hpp"
 #include "jsonrpc.hpp"
+#include "log.hpp"
 #include "lsp.hpp"
 #include "version.hpp"
 
 #include <CLI/CLI.hpp>
 #include <csignal>
 #include <nlohmann/json.hpp>
-#include <spdlog/spdlog.h>
-#include <spdlog/sinks/basic_file_sink.h>
-#include <spdlog/sinks/null_sink.h>
 
 #if defined(WIN32)
     #include <fcntl.h>
@@ -147,38 +145,6 @@ static void SignalHandler(int)
     }
 }
 
-void ConfigureLogging(bool fileLogging, std::string filename, spdlog::level::level_enum level)
-{
-    try
-    {
-        spdlog::sink_ptr sink;
-        if (fileLogging)
-        {
-            sink = std::make_shared<spdlog::sinks::basic_file_sink_st>(filename);
-        }
-        else
-        {
-            sink = std::make_shared<spdlog::sinks::null_sink_st>();
-        }
-        spdlog::set_default_logger(std::make_shared<spdlog::logger>("opencl-ls", sink));
-        spdlog::set_level(level);
-        std::vector<std::shared_ptr<spdlog::logger>> subLoggers = {
-            std::make_shared<spdlog::logger>("clinfo", sink),
-            std::make_shared<spdlog::logger>("diagnostics", sink),
-            std::make_shared<spdlog::logger>("jrpc", sink),
-            std::make_shared<spdlog::logger>("lsp", sink)};
-        for (const auto& logger : subLoggers)
-        {
-            logger->set_level(level);
-            spdlog::register_logger(logger);
-        }
-    }
-    catch (const spdlog::spdlog_ex& ex)
-    {
-        std::cerr << "Log init failed: " << ex.what() << std::endl;
-    }
-}
-
 inline void SetupBinaryStreamMode()
 {
 #if defined(WIN32)
@@ -229,7 +195,14 @@ int main(int argc, char* argv[])
     CLInfoSubCommand clInfoCmd(app);
     DiagnosticsSubCommand diagnosticsCmd(app);
     CLI11_PARSE(app, argc, argv);
-    ConfigureLogging(flagLogTofile, optLogFile, optLogLevel);
+    if(flagLogTofile)
+    {
+        ConfigureFileLogging(optLogFile, optLogLevel);
+    }
+    else
+    {
+        ConfigureNullLogging();
+    }
 
     auto clinfo = CreateCLInfo();
     if (clInfoCmd.IsParsed())
