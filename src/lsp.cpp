@@ -124,11 +124,11 @@ void LSPServerEventsHandler::GetConfiguration()
 {
     if (!m_capabilities.hasConfigurationCapability)
     {
-        logger()->debug("Does not have configuration capability");
+        logger()->trace("Does not have configuration capability");
         return;
     }
 
-    logger()->debug("Make configuration request");
+    logger()->trace("Make configuration request");
     json buildOptions = {{"section", "OpenCL.server.buildOptions"}};
     json maxNumberOfProblems = {{"section", "OpenCL.server.maxNumberOfProblems"}};
     json openCLDeviceID = {{"section", "OpenCL.server.deviceID"}};
@@ -154,7 +154,7 @@ std::optional<json> LSPServerEventsHandler::GetNextResponse()
 
 void LSPServerEventsHandler::OnInitialize(const json &data)
 {
-    logger()->debug("Received 'initialize' request");
+    logger()->trace("Received 'initialize' request");
     if (!data.contains("id"))
     {
         logger()->error("'initialize' message does not contain 'id'");
@@ -211,7 +211,7 @@ void LSPServerEventsHandler::OnInitialize(const json &data)
 
 void LSPServerEventsHandler::OnInitialized(const json &data)
 {
-    logger()->debug("Received 'initialized' message");
+    logger()->trace("Received 'initialized' message");
     if (!data.contains("id"))
     {
         logger()->error("'initialized' message does not contain 'id'");
@@ -222,7 +222,7 @@ void LSPServerEventsHandler::OnInitialized(const json &data)
 
     if (!m_capabilities.supportDidChangeConfiguration)
     {
-        logger()->debug("Does not support didChangeConfiguration registration");
+        logger()->trace("Does not support didChangeConfiguration registration");
         return;
     }
 
@@ -243,8 +243,7 @@ void LSPServerEventsHandler::BuildDiagnosticsRespond(const std::string &uri, con
     try
     {
         const auto filePath = utils::UriToFilePath(uri);
-        logger()->debug("Converted uri '{}' to path '{}'", uri, filePath);
-
+        logger()->trace("'{}' -> '{}'", uri, filePath);
         json diags = m_diagnostics->GetDiagnostics({filePath, content});
         m_outQueue.push(
             {{"method", "textDocument/publishDiagnostics"},
@@ -264,7 +263,7 @@ void LSPServerEventsHandler::BuildDiagnosticsRespond(const std::string &uri, con
 
 void LSPServerEventsHandler::OnTextOpen(const json &data)
 {
-    logger()->debug("Received 'textOpen' message");
+    logger()->trace("Received 'textOpen' message");
     auto uri = GetNestedValue(data, {"params", "textDocument", "uri"});
     auto content = GetNestedValue(data, {"params", "textDocument", "text"});
     if (uri && content)
@@ -275,7 +274,7 @@ void LSPServerEventsHandler::OnTextOpen(const json &data)
 
 void LSPServerEventsHandler::OnTextChanged(const json &data)
 {
-    logger()->debug("Received 'textChanged' message");
+    logger()->trace("Received 'textChanged' message");
     auto uri = GetNestedValue(data, {"params", "textDocument", "uri"});
     auto contentChanges = GetNestedValue(data, {"params", "contentChanges"});
     if (contentChanges && contentChanges->size() > 0)
@@ -293,7 +292,7 @@ void LSPServerEventsHandler::OnTextChanged(const json &data)
 
 void LSPServerEventsHandler::OnConfiguration(const json &data)
 {
-    logger()->debug("Received 'configuration' respond");
+    logger()->trace("Received 'configuration' respond");
 
     try
     {
@@ -335,7 +334,7 @@ void LSPServerEventsHandler::OnConfiguration(const json &data)
 
 void LSPServerEventsHandler::OnRespond(const json &data)
 {
-    logger()->debug("Received client respond");
+    logger()->trace("Received client respond");
     if (m_requests.empty())
     {
         logger()->warn("Unexpected respond {}", data.dump());
@@ -364,14 +363,14 @@ void LSPServerEventsHandler::OnRespond(const json &data)
 
 void LSPServerEventsHandler::OnShutdown(const json &data)
 {
-    logger()->debug("Received 'shutdown' request");
+    logger()->trace("Received 'shutdown' request");
     m_outQueue.push({{"id", data["id"]}, {"result", nullptr}});
     m_shutdown = true;
 }
 
 void LSPServerEventsHandler::OnExit()
 {
-    logger()->debug("Received 'exit', after 'shutdown': {}", utils::FormatBool(m_shutdown));
+    logger()->trace("Received 'exit', after 'shutdown': {}", utils::FormatBool(m_shutdown));
     if (m_shutdown)
     {
         m_exitHandler->OnExit(EXIT_SUCCESS);
@@ -386,7 +385,7 @@ void LSPServerEventsHandler::OnExit()
 
 int LSPServer::Run()
 {
-    logger()->info("Setting up...");
+    logger()->trace("Setting up...");
     auto self = this->shared_from_this();
     // clang-format off
     // Register handlers for methods
@@ -435,7 +434,7 @@ int LSPServer::Run()
     });
     // clang-format on
 
-    logger()->info("Listening...");
+    logger()->trace("Listening...");
     char c;
     while (std::cin.get(c))
     {

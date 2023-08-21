@@ -35,6 +35,8 @@ std::shared_ptr<IGenerator> CreateDefaultGenerator();
 
 std::shared_ptr<IExitHandler> CreateDefaultExitHandler();
 
+std::string GetCurrentDateTime();
+
 // --- String Helpers ---
 
 std::vector<std::string> SplitString(const std::string& str, const std::string& pattern);
