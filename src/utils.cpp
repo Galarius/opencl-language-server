@@ -8,6 +8,7 @@
 #include "utils.hpp"
 
 #include <algorithm>
+#include <chrono>
 #include <functional>
 #include <fstream>
 #include <iomanip>
@@ -65,6 +66,15 @@ public:
 std::shared_ptr<IExitHandler> CreateDefaultExitHandler()
 {
     return std::make_shared<DefaultExitHandler>();
+}
+
+std::string GetCurrentDateTime() 
+{
+    auto now = std::chrono::system_clock::now();
+    auto itt = std::chrono::system_clock::to_time_t(now);
+    std::stringstream ss;
+    ss << std::put_time(gmtime(&itt), "%Y-%m-%d %H:%M:%S");
+    return ss.str();
 }
 
 // --- String Helpers ---

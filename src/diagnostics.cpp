@@ -82,7 +82,7 @@ public:
             {
                 if (count++ >= problemsLimit)
                 {
-                    logger()->info("Maximum number of problems reached, other problems will be skipped");
+                    logger()->warn("Maximum number of problems reached, other problems will be skipped");
                     break;
                 }
                 diagnostics.emplace_back(CreateDiagnostic(matches, name));
@@ -145,7 +145,7 @@ void Diagnostics::SetBuildOptions(const json& options)
 void Diagnostics::SetBuildOptions(const std::string& options)
 {
     m_BuildOptions = options;
-    logger()->trace("Set build options, {}", m_BuildOptions);
+    logger()->trace("Set build options: {}", m_BuildOptions);
 }
 
 void Diagnostics::SetMaxProblemsCount(uint64_t maxNumberOfProblems)
@@ -156,7 +156,7 @@ void Diagnostics::SetMaxProblemsCount(uint64_t maxNumberOfProblems)
 
 void Diagnostics::SetOpenCLDevice(uint32_t identifier)
 {
-    logger()->trace("Selecting OpenCL device...");
+    logger()->trace("Selecting OpenCL device [{}]...", identifier);
 
     const auto devices = m_clInfo->GetDevices();
 
@@ -168,13 +168,13 @@ void Diagnostics::SetOpenCLDevice(uint32_t identifier)
     auto selectedDevice = SelectOpenCLDevice(devices, identifier);
     if (!selectedDevice)
     {
-        logger()->warn("No suitable OpenCL device was found.");
+        logger()->warn("No suitable OpenCL device was found");
         return;
     }
 
     m_device = selectedDevice;
     auto description = m_clInfo->GetDeviceDescription(*m_device);
-    logger()->info("Selected OpenCL device: {}", description);
+    logger()->debug("Selected OpenCL device: {}", description);
 }
 
 std::string Diagnostics::GetBuildLog(const Source& source)
@@ -223,6 +223,7 @@ std::optional<cl::Device> Diagnostics::SelectOpenCLDevice(const std::vector<cl::
 {
     if (identifier > 0)
     {
+        logger()->trace("Searching for the device by ID '{}'...", identifier);
         auto it = std::find_if(devices.begin(), devices.end(), [this, &identifier](const cl::Device& device) {
             try
             {
@@ -241,6 +242,7 @@ std::optional<cl::Device> Diagnostics::SelectOpenCLDevice(const std::vector<cl::
     }
 
     // If device is not found by identifier, then find the device based on power index
+    logger()->trace("Searching for the device by power index...");
     auto device = SelectOpenCLDeviceByPowerIndex(devices);
     if (device && (!m_device || m_clInfo->GetDevicePowerIndex(*device) > m_clInfo->GetDevicePowerIndex(*m_device)))
     {
@@ -262,7 +264,14 @@ std::string Diagnostics::BuildSource(const std::string& source) const
     cl::Program program;
     try
     {
-        logger()->debug("Building program with options: {}", m_BuildOptions);
+        if(m_BuildOptions.empty())
+        {
+            logger()->trace("Building program...");
+        }
+        else
+        {
+            logger()->trace("Building program with options: {}...", m_BuildOptions);
+        }
         program = cl::Program(context, source, false);
         program.build(ds, m_BuildOptions.c_str());
     }
@@ -270,7 +279,7 @@ std::string Diagnostics::BuildSource(const std::string& source) const
     {
         if (err.err() != CL_BUILD_PROGRAM_FAILURE)
         {
-            logger()->error("Failed to build program: {} ({})", err.what(), err.err());
+            logger()->error("Failed to build the program: {} ({})", err.what(), err.err());
             throw err;
         }
     }
@@ -283,7 +292,7 @@ std::string Diagnostics::BuildSource(const std::string& source) const
     }
     catch (cl::Error& err)
     {
-        logger()->error("Failed get build info, error, {}", err.what());
+        logger()->error("Failed get build info, {}", err.what());
     }
 
     return build_log;

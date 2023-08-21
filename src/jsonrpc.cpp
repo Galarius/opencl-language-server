@@ -11,6 +11,7 @@
 
 #include <iostream>
 #include <regex>
+#include <sstream>
 #include <unordered_map>
 
 using namespace nlohmann;
@@ -270,8 +271,9 @@ void JsonRPC::OnInitialize()
         m_tracing = traceValue != "off";
         m_verbosity = traceValue == "verbose";
         m_initialized = true;
-        logger()->debug(
-            "Tracing options: is verbose: {}, is on: {}", utils::FormatBool(m_verbosity), utils::FormatBool(m_tracing));
+        logger()->trace("Tracing options: is verbose: {}, is on: {}",
+                        utils::FormatBool(m_verbosity),
+                        utils::FormatBool(m_tracing));
     }
     catch (std::exception& err)
     {
@@ -286,8 +288,9 @@ void JsonRPC::OnTracingChanged(const json& data)
         const auto traceValue = data["params"]["value"].get<std::string>();
         m_tracing = traceValue != "off";
         m_verbosity = traceValue == "verbose";
-        logger()->debug(
-            "Tracing options were changed, is verbose: {}, is on: {}", utils::FormatBool(m_verbosity), utils::FormatBool(m_tracing));
+        logger()->trace("Tracing options were changed, is verbose: {}, is on: {}",
+                        utils::FormatBool(m_verbosity),
+                        utils::FormatBool(m_tracing));
     }
     catch (std::exception& err)
     {
@@ -319,7 +322,7 @@ void JsonRPC::FireRespondCallback()
 {
     if (m_respondCallback)
     {
-        logger()->debug("Calling handler for a client respond");
+        logger()->trace("Calling handler for a client respond");
         m_respondCallback(m_body);
     }
 }
@@ -332,8 +335,9 @@ void JsonRPC::FireMethodCallback()
     {
         const bool isRequest = m_body["params"]["id"] != nullptr;
         const bool mustRespond = isRequest || m_method.rfind("$/", 0) == std::string::npos;
-        logger()->debug(
-            "Got request: {}, respond is required: {}", utils::FormatBool(isRequest), utils::FormatBool(mustRespond));
+        logger()->trace("Got request: {}, respond is required: {}",
+                        utils::FormatBool(isRequest),
+                        utils::FormatBool(mustRespond));
         if (mustRespond)
         {
             WriteError(JRPCErrorCode::MethodNotFound, "Method '" + m_method + "' is not supported.");
@@ -343,7 +347,7 @@ void JsonRPC::FireMethodCallback()
     {
         try
         {
-            logger()->debug("Calling handler for method: '{}'", m_method);
+            logger()->trace("Calling handler for method: '{}'", m_method);
             callback->second(m_body);
         }
         catch (std::exception& err)
@@ -372,15 +376,16 @@ void JsonRPC::LogBufferContent() const
         return;
     }
 
-    logger()->debug("");
-    logger()->debug(">>>>>>>>>>>>>>>>");
+    std::stringstream ss;
+    ss << "\n>>>>>>>>>>>>>>>>\n";
     for (auto& header : m_headers)
     {
-        logger()->debug(header.first, ": ", header.second);
+        ss << header.first << ": " << header.second;
     }
-    logger()->debug(m_buffer);
-    logger()->debug(">>>>>>>>>>>>>>>>");
-    logger()->debug("");
+    ss << m_buffer;
+    ss << "\n>>>>>>>>>>>>>>>>\n";
+
+    logger()->debug(ss.str());
 }
 
 void JsonRPC::LogMessage(const std::string& message) const
@@ -389,12 +394,13 @@ void JsonRPC::LogMessage(const std::string& message) const
     {
         return;
     }
+    
+    std::stringstream ss;
+    ss  << "\n<<<<<<<<<<<<<<<<\n"
+        << message
+        << "\n<<<<<<<<<<<<<<<<\n";
 
-    logger()->debug("");
-    logger()->debug("<<<<<<<<<<<<<<<<");
-    logger()->debug(message);
-    logger()->debug("<<<<<<<<<<<<<<<<");
-    logger()->debug("");
+    logger()->debug(ss.str());
 }
 
 void JsonRPC::LogAndHandleParseError(std::exception& e)

@@ -18,7 +18,10 @@ using ocls::ICLInfo;
 
 namespace {
 
-auto logger() { return spdlog::get(ocls::LogName::clinfo); }
+auto logger()
+{
+    return spdlog::get(ocls::LogName::clinfo);
+}
 
 const std::unordered_map<cl_bool, std::string> booleanChoices {
     {CL_TRUE, "CL_TRUE"},
@@ -351,7 +354,6 @@ json::object_t GetDeviceJSONInfo(const cl::Device& device)
         catch (const cl::Error& err)
         {
             logger()->error("Failed to get info for the device, {}", err.what());
-            continue;
         }
     }
     return info;
@@ -373,7 +375,7 @@ uint32_t CalculateDeviceID(const cl::Device& device)
     }
     catch (const cl::Error& err)
     {
-        logger()->error("Failed to calculate device uuid, {}", err.what());
+        logger()->error("Failed to calculate the device uuid, {}", err.what());
     }
     return 0;
 }
@@ -403,7 +405,7 @@ uint32_t CalculatePlatformID(const cl::Platform& platform)
     }
     catch (const cl::Error& err)
     {
-        logger()->error("Failed to calculate platform uuid, {}", err.what());
+        logger()->error("Failed to calculate the platform uuid, {}", err.what());
     }
     return 0;
 }
@@ -421,7 +423,7 @@ json GetPlatformJSONInfo(const cl::Platform& platform)
         }
         catch (const cl::Error& err)
         {
-            logger()->error("Failed to get info for a platform, {}", err.what());
+            logger()->error("Failed to get information for the platform, {}", err.what());
         }
     }
 
@@ -438,7 +440,7 @@ json GetPlatformJSONInfo(const cl::Platform& platform)
     }
     catch (const cl::Error& err)
     {
-        logger()->error("Failed to get devices for a platform, {}", err.what());
+        logger()->error("Failed to get platform's devices, {}", err.what());
     }
 
     return info;
@@ -449,26 +451,16 @@ class CLInfo final : public ICLInfo
 public:
     nlohmann::json json()
     {
-        logger()->trace("Searching for OpenCL platforms...");
-        std::vector<cl::Platform> platforms;
-        try
-        {
-            cl::Platform::get(&platforms);
-        }
-        catch (const cl::Error& err)
-        {
-            logger()->error("No OpenCL platforms were found ({})", err.what());
-        }
-
-        logger()->info("Found OpenCL platforms, {}", platforms.size());
+        const auto platforms = GetPlatforms();
         if (platforms.size() == 0)
         {
             return {};
         }
 
         std::vector<nlohmann::json> jsonPlatforms;
-        for (auto& platform : platforms)
+        for (const auto& platform : platforms)
         {
+            logger()->trace("{}", GetPlatformDescription(platform));
             jsonPlatforms.emplace_back(GetPlatformJSONInfo(platform));
         }
 
@@ -477,30 +469,59 @@ public:
 
     std::vector<cl::Platform> GetPlatforms()
     {
+        logger()->trace("Searching for OpenCL platforms...");
         std::vector<cl::Platform> platforms;
         try
         {
             cl::Platform::get(&platforms);
-            logger()->info("Found OpenCL platforms: {}", platforms.size());
+            logger()->trace("Found OpenCL platforms: {}", platforms.size());
         }
         catch (cl::Error& err)
         {
-            logger()->error("No OpenCL platforms were found, {}", err.what());
+            logger()->error("Failed to find OpenCL platforms, {}", err.what());
         }
         return platforms;
+    }
+
+    std::string GetPlatformDescription(const cl::Platform& platform)
+    {
+        try
+        {
+            auto name = platform.getInfo<CL_PLATFORM_NAME>();
+            auto vendor = platform.getInfo<CL_PLATFORM_VENDOR>();
+            auto version = platform.getInfo<CL_PLATFORM_VERSION>();
+            auto profile = platform.getInfo<CL_PLATFORM_PROFILE>();
+            auto description = "name: " + std::move(name) + "; " + "vendor: " + std::move(vendor) + "; " +
+                "version: " + std::move(version) + "; " + "profile: " + std::move(profile);
+            return description;
+        }
+        catch (cl::Error& err)
+        {
+            logger()->error("Failed to get the platform's description, {}", err.what());
+        }
+        return "unknown";
     }
 
     std::vector<cl::Device> GetDevices()
     {
         std::vector<cl::Device> devices;
-        const auto platforms = GetPlatforms();
-        for (const auto& platform : platforms)
+        auto platforms = GetPlatforms();
+        for (auto& platform : platforms)
         {
+            logger()->trace("Platform {}", GetPlatformDescription(platform));
+            logger()->trace("Searching for platform's devices...");
             try
             {
                 std::vector<cl::Device> platformDevices;
                 platform.getDevices(CL_DEVICE_TYPE_ALL, &platformDevices);
-                logger()->info("Found OpenCL devices: {}", platformDevices.size());
+                if (logger()->level() <= spdlog::level::trace)
+                {
+                    logger()->trace("Found OpenCL devices: {}", platformDevices.size());
+                    for (auto& device : platformDevices)
+                    {
+                        logger()->trace("Device {}", GetDeviceDescription(device));
+                    }
+                }
                 devices.insert(
                     devices.end(),
                     std::make_move_iterator(platformDevices.begin()),
@@ -508,7 +529,7 @@ public:
             }
             catch (cl::Error& err)
             {
-                logger()->error("No OpenCL devices were found, {}", err.what());
+                logger()->error("Failed to find the platform's devices, {}", err.what());
             }
         }
         return devices;
@@ -536,7 +557,7 @@ public:
         }
         catch (cl::Error& err)
         {
-            logger()->error("Failed to get description for the selected device, {}", err.what());
+            logger()->error("Failed to get the device's description, {}", err.what());
         }
         return "unknown";
     }
@@ -551,7 +572,7 @@ public:
         }
         catch (const cl::Error& err)
         {
-            logger()->error("Failed to get power index for the device, {}", err.what());
+            logger()->error("Failed to get the device's power index, {}", err.what());
         }
         return 0;
     }

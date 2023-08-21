@@ -6,9 +6,11 @@
 //
 
 #include "log.hpp"
+#include "utils.hpp"
 
 #include <iostream>
 
+#include "spdlog/pattern_formatter.h"
 #include <spdlog/sinks/basic_file_sink.h>
 #include <spdlog/sinks/null_sink.h>
 
@@ -47,6 +49,8 @@ void ConfigureLogging(bool fileLogging, const std::string& filename, spdlog::lev
             logger->set_level(level);
             spdlog::register_logger(logger);
         }
+        
+        spdlog::get(LogName::main)->info("\nStarting new session at {}...\n", utils::GetCurrentDateTime());
     }
     catch (const spdlog::spdlog_ex& ex)
     {
