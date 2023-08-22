@@ -203,7 +203,7 @@ TEST_F(LSPTest, OnInitialized_withDidChangeConfigurationSupport_shouldBuildRespo
     })"_json;
 
     nlohmann::json expectedResponse = R"({
-        "id": "1",
+        "id": "12345678",
         "method": "client/registerCapability",
         "params": {
             "registrations": [{
@@ -216,9 +216,9 @@ TEST_F(LSPTest, OnInitialized_withDidChangeConfigurationSupport_shouldBuildRespo
     handler->OnInitialize(initData);
     handler->GetNextResponse();
 
-    EXPECT_CALL(*mockGenerator, GenerateID()).Times(1);
+    EXPECT_CALL(*mockGenerator, GenerateID()).Times(2);
 
-    handler->OnInitialized(R"({"id": "1"})"_json);
+    handler->OnInitialized({});
     auto response = handler->GetNextResponse();
 
     EXPECT_TRUE(response.has_value());

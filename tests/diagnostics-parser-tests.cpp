@@ -73,7 +73,7 @@ TEST(ParseDiagnosticsTest, NoDiagnosticMessages)
     std::string log = "This is a regular log with no diagnostic message.";
     auto parser = CreateDiagnosticsParser();
     auto result = parser->ParseDiagnostics(log, "TestName", 10);
-    EXPECT_TRUE(result.is_null());
+    EXPECT_EQ(result.size(), 0);
 }
 
 TEST(ParseDiagnosticsTest, SingleDiagnosticMessage)
@@ -189,5 +189,5 @@ TEST(ParseDiagnosticsTest, MalformedDiagnosticMessage)
     std::string log = "<sample source>:5:14: reference missing for citation";
     auto parser = CreateDiagnosticsParser();
     auto result = parser->ParseDiagnostics(log, "TestName", 10);
-    EXPECT_TRUE(result.is_null());
+    EXPECT_EQ(result.size(), 0);
 }

@@ -77,5 +77,5 @@ TEST(DiagnosticsTest, SelectDeviceBasedOnNonExistingIndex)
     EXPECT_CALL(*mockCLInfo, GetDeviceDescription(_)).WillOnce(Return(""));
 
     auto diagnostics = CreateDiagnostics(mockCLInfo);
-    diagnostics->SetOpenCLDevice(4527288514);
+    diagnostics->SetOpenCLDevice(static_cast<uint32_t>(4527288514));
 }
