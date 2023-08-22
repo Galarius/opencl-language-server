@@ -209,16 +209,9 @@ void LSPServerEventsHandler::OnInitialize(const json &data)
     m_outQueue.push({{"id", requestId}, {"result", {{"capabilities", capabilities}}}});
 }
 
-void LSPServerEventsHandler::OnInitialized(const json &data)
+void LSPServerEventsHandler::OnInitialized(const json &)
 {
     logger()->trace("Received 'initialized' message");
-    if (!data.contains("id"))
-    {
-        logger()->error("'initialized' message does not contain 'id'");
-        return;
-    }
-
-    auto requestId = data["id"];
 
     if (!m_capabilities.supportDidChangeConfiguration)
     {
@@ -235,7 +228,7 @@ void LSPServerEventsHandler::OnInitialized(const json &data)
         {"registrations", registrations},
     };
 
-    m_outQueue.push({{"id", requestId}, {"method", "client/registerCapability"}, {"params", params}});
+    m_outQueue.push({{"id", m_generator->GenerateID()}, {"method", "client/registerCapability"}, {"params", params}});
 }
 
 void LSPServerEventsHandler::BuildDiagnosticsRespond(const std::string &uri, const std::string &content)

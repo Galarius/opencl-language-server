@@ -71,7 +71,7 @@ public:
 
     nlohmann::json ParseDiagnostics(const std::string& buildLog, const std::string& name, uint64_t problemsLimit)
     {
-        nlohmann::json diagnostics;
+        nlohmann::json diagnostics = nlohmann::json::array();
         std::istringstream stream(buildLog);
         std::string errLine;
         uint64_t count = 0;
@@ -189,14 +189,13 @@ std::string Diagnostics::GetBuildLog(const Source& source)
 
 nlohmann::json Diagnostics::GetDiagnostics(const Source& source)
 {
-    std::string buildLog = GetBuildLog(source);
     std::string srcName;
     if (!source.filePath.empty())
     {
         auto filePath = std::filesystem::path(source.filePath).string();
         srcName = std::filesystem::path(filePath).filename().string();
     }
-    buildLog = BuildSource(source.text);
+    std::string buildLog = GetBuildLog(source);
     logger()->trace("BuildLog:\n{}", buildLog);
     return m_parser->ParseDiagnostics(buildLog, srcName, m_maxNumberOfProblems);
 }

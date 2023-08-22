@@ -165,6 +165,7 @@ inline void SetupBinaryStreamMode()
 int main(int argc, char* argv[])
 {
     bool flagLogTofile = false;
+    bool flagStdioMode = true;
     std::string optLogFile = "opencl-language-server.log";
     spdlog::level::level_enum optLogLevel = spdlog::level::trace;
 
@@ -184,6 +185,7 @@ int main(int argc, char* argv[])
              spdlog::level::critical}))
         ->required(false)
         ->capture_default_str();
+    app.add_flag("--stdio", flagStdioMode, "Use stdio transport channel for the language server");
     app.add_flag_callback(
         "-v,--version",
         []() {
