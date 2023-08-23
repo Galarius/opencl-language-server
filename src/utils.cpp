@@ -72,10 +72,19 @@ std::string GetCurrentDateTime()
 {
     auto now = std::chrono::system_clock::now();
     auto itt = std::chrono::system_clock::to_time_t(now);
+    std::tm tm = {};
+
+#if defined(WIN32)
+    gmtime_s(&tm, &itt);
+#else
+    tm = *gmtime(&itt);
+#endif
+
     std::stringstream ss;
-    ss << std::put_time(gmtime(&itt), "%Y-%m-%d %H:%M:%S");
+    ss << std::put_time(&tm, "%Y-%m-%d %H:%M:%S");
     return ss.str();
 }
+
 
 // --- String Helpers ---
 
@@ -108,11 +117,11 @@ bool EndsWith(const std::string& str, const std::string& suffix)
 
 // --- File Helpers ---
 
-std::string UriToFilePath(const std::string& uri, bool unix)
+std::string UriToFilePath(const std::string& uri, bool isUnix)
 {
     const size_t bytesNeeded = 8 + 3 * uri.length() + 1;
     char* fileName = (char*)malloc(bytesNeeded * sizeof(char));
-    if (unix)
+    if (isUnix)
     {
         if (uriUriStringToUnixFilenameA(uri.c_str(), fileName) != URI_SUCCESS)
         {
@@ -142,7 +151,7 @@ std::string UriToFilePath(const std::string& uri)
 #endif
 }
 
-std::optional<std::string> ReadFileContent(std::string_view fileName)
+std::optional<std::string> ReadFileContent(const std::string& fileName)
 {
     std::string content;
     std::ifstream file(fileName);

@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <array>
 #include <cstdint>
+#include <memory>
 #include <numeric>
 #include <optional>
 #include <string>
@@ -52,11 +53,11 @@ inline std::string FormatBool(bool flag)
 
 // --- File Helpers ---
 
-std::string UriToFilePath(const std::string& uri, bool unix);
+std::string UriToFilePath(const std::string& uri, bool isUnix);
 
 std::string UriToFilePath(const std::string& uri);
 
-std::optional<std::string> ReadFileContent(std::string_view fileName);
+std::optional<std::string> ReadFileContent(const std::string& fileName);
 
 // --- CRC32 ---
 
