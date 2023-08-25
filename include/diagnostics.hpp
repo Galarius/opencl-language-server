@@ -14,6 +14,7 @@
 #include <string>
 #include <regex>
 #include <tuple>
+#include <optional>
 
 namespace ocls {
 
@@ -46,6 +47,7 @@ struct IDiagnostics
     virtual void SetMaxProblemsCount(uint64_t maxNumberOfProblems) = 0;
     virtual void SetOpenCLDevice(uint32_t identifier) = 0;
 
+    virtual std::optional<ocls::Device> GetDevice() const = 0;
     virtual std::string GetBuildLog(const Source& source) = 0;
     virtual nlohmann::json GetDiagnostics(const Source& source) = 0;
 };

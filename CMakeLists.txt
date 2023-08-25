@@ -58,6 +58,7 @@ endif()
 
 set(headers
     clinfo.hpp
+    device.hpp
     diagnostics.hpp
     jsonrpc.hpp
     log.hpp

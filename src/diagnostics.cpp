@@ -5,11 +5,10 @@
 //  Created by Ilia Shoshin on 7/16/21.
 //
 
+#include "device.hpp"
 #include "diagnostics.hpp"
 #include "log.hpp"
 #include "utils.hpp"
-
-#include <CL/opencl.hpp>
 
 #include <filesystem>
 #include <iostream>
@@ -21,7 +20,10 @@ using namespace nlohmann;
 
 namespace {
 
-auto logger() { return spdlog::get(ocls::LogName::diagnostics); }
+auto logger()
+{
+    return spdlog::get(ocls::LogName::diagnostics);
+}
 
 } // namespace
 
@@ -103,18 +105,19 @@ public:
     void SetBuildOptions(const std::string& options);
     void SetMaxProblemsCount(uint64_t maxNumberOfProblems);
     void SetOpenCLDevice(uint32_t identifier);
+    std::optional<ocls::Device> GetDevice() const;
     std::string GetBuildLog(const Source& source);
     nlohmann::json GetDiagnostics(const Source& source);
 
 private:
-    std::optional<cl::Device> SelectOpenCLDevice(const std::vector<cl::Device>& devices, uint32_t identifier);
-    std::optional<cl::Device> SelectOpenCLDeviceByPowerIndex(const std::vector<cl::Device>& devices);
+    std::optional<ocls::Device> SelectOpenCLDevice(const std::vector<ocls::Device>& devices, uint32_t identifier);
+    std::optional<ocls::Device> SelectOpenCLDeviceByPowerIndex(const std::vector<ocls::Device>& devices);
     std::string BuildSource(const std::string& source) const;
 
 private:
     std::shared_ptr<ICLInfo> m_clInfo;
     std::shared_ptr<IDiagnosticsParser> m_parser;
-    std::optional<cl::Device> m_device;
+    std::optional<ocls::Device> m_device;
     std::string m_BuildOptions;
     uint64_t m_maxNumberOfProblems = INT8_MAX;
 };
@@ -173,8 +176,12 @@ void Diagnostics::SetOpenCLDevice(uint32_t identifier)
     }
 
     m_device = selectedDevice;
-    auto description = m_clInfo->GetDeviceDescription(*m_device);
-    logger()->debug("Selected OpenCL device: {}", description);
+    logger()->debug("Selected OpenCL device: {}", (*m_device).GetDescription());
+}
+
+std::optional<ocls::Device> Diagnostics::GetDevice() const
+{
+    return m_device;
 }
 
 std::string Diagnostics::GetBuildLog(const Source& source)
@@ -202,12 +209,10 @@ nlohmann::json Diagnostics::GetDiagnostics(const Source& source)
 
 // -
 
-std::optional<cl::Device> Diagnostics::SelectOpenCLDeviceByPowerIndex(const std::vector<cl::Device>& devices)
+std::optional<ocls::Device> Diagnostics::SelectOpenCLDeviceByPowerIndex(const std::vector<ocls::Device>& devices)
 {
-    auto maxIt = std::max_element(devices.begin(), devices.end(), [this](const cl::Device& a, const cl::Device& b) {
-        const auto powerIndexA = m_clInfo->GetDevicePowerIndex(a);
-        const auto powerIndexB = m_clInfo->GetDevicePowerIndex(b);
-        return powerIndexA < powerIndexB;
+    auto maxIt = std::max_element(devices.begin(), devices.end(), [](const ocls::Device& a, const ocls::Device& b) {
+        return a.GetPowerIndex() < b.GetPowerIndex();
     });
 
     if (maxIt == devices.end())
@@ -218,15 +223,16 @@ std::optional<cl::Device> Diagnostics::SelectOpenCLDeviceByPowerIndex(const std:
     return *maxIt;
 }
 
-std::optional<cl::Device> Diagnostics::SelectOpenCLDevice(const std::vector<cl::Device>& devices, uint32_t identifier)
+std::optional<ocls::Device> Diagnostics::SelectOpenCLDevice(
+    const std::vector<ocls::Device>& devices, uint32_t identifier)
 {
     if (identifier > 0)
     {
         logger()->trace("Searching for the device by ID '{}'...", identifier);
-        auto it = std::find_if(devices.begin(), devices.end(), [this, &identifier](const cl::Device& device) {
+        auto it = std::find_if(devices.begin(), devices.end(), [&identifier](const ocls::Device& device) {
             try
             {
-                return m_clInfo->GetDeviceID(device) == identifier;
+                return device.GetID() == identifier;
             }
             catch (const cl::Error&)
             {
@@ -243,7 +249,7 @@ std::optional<cl::Device> Diagnostics::SelectOpenCLDevice(const std::vector<cl::
     // If device is not found by identifier, then find the device based on power index
     logger()->trace("Searching for the device by power index...");
     auto device = SelectOpenCLDeviceByPowerIndex(devices);
-    if (device && (!m_device || m_clInfo->GetDevicePowerIndex(*device) > m_clInfo->GetDevicePowerIndex(*m_device)))
+    if (device && (!m_device || (*device).GetPowerIndex() > (*m_device).GetPowerIndex()))
     {
         return device;
     }
@@ -258,12 +264,12 @@ std::string Diagnostics::BuildSource(const std::string& source) const
         throw std::runtime_error("missing OpenCL device");
     }
 
-    std::vector<cl::Device> ds {*m_device};
+    std::vector<cl::Device> ds {(*m_device).getUnderlyingDevice()};
     cl::Context context(ds, NULL, NULL, NULL);
     cl::Program program;
     try
     {
-        if(m_BuildOptions.empty())
+        if (m_BuildOptions.empty())
         {
             logger()->trace("Building program...");
         }
@@ -287,7 +293,7 @@ std::string Diagnostics::BuildSource(const std::string& source) const
 
     try
     {
-        program.getBuildInfo(*m_device, CL_PROGRAM_BUILD_LOG, &build_log);
+        program.getBuildInfo(m_device->getUnderlyingDevice(), CL_PROGRAM_BUILD_LOG, &build_log);
     }
     catch (cl::Error& err)
     {

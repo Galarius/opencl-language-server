@@ -20,7 +20,9 @@ public:
 
     MOCK_METHOD(void, SetOpenCLDevice, (uint32_t), (override));
 
+    MOCK_METHOD(std::optional<ocls::Device>, GetDevice, (), (const, override));
+
     MOCK_METHOD(std::string, GetBuildLog, (const ocls::Source&), (override));
-    
+
     MOCK_METHOD(nlohmann::json, GetDiagnostics, (const ocls::Source&), (override));
 };

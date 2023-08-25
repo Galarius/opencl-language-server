@@ -7,7 +7,7 @@
 
 #pragma once
 
-#include <CL/opencl.hpp>
+#include "device.hpp"
 
 #include <memory>
 #include <nlohmann/json.hpp>
@@ -21,13 +21,7 @@ struct ICLInfo
 
     virtual nlohmann::json json() = 0;
 
-    virtual std::vector<cl::Device> GetDevices() = 0;
-
-    virtual uint32_t GetDeviceID(const cl::Device& device) = 0;
-
-    virtual std::string GetDeviceDescription(const cl::Device& device) = 0;
-
-    virtual size_t GetDevicePowerIndex(const cl::Device& device) = 0;
+    virtual std::vector<Device> GetDevices() = 0;
 };
 
 std::shared_ptr<ICLInfo> CreateCLInfo();

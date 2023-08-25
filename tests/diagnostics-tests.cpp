@@ -16,66 +16,68 @@
 using namespace ocls;
 using namespace testing;
 
+namespace {
 
-TEST(DiagnosticsTest, SelectDeviceBasedOnPowerIndexDuringTheCreation)
+const uint32_t deviceID1 = 12345678;
+const uint32_t deviceID2 = 23456789;
+
+std::vector<Device> GetTestDevices()
 {
-    auto mockCLInfo = std::make_shared<CLInfoMock>();
-    std::vector<cl::Device> devices = {cl::Device(), cl::Device()};
-
-    EXPECT_CALL(*mockCLInfo, GetDevices()).WillOnce(Return(devices));
-    EXPECT_CALL(*mockCLInfo, GetDevicePowerIndex(_)).WillOnce(Return(10)).WillOnce(Return(10));
-    EXPECT_CALL(*mockCLInfo, GetDeviceDescription(_)).WillOnce(Return(""));
-
-    CreateDiagnostics(mockCLInfo);
+    return {Device(deviceID1, "Test Device 1", 10), Device(deviceID2, "Test Device 2", 20)};
 }
 
-TEST(DiagnosticsTest, SelectDeviceBasedOnPowerIndex)
+class DiagnosticsTest : public ::testing::Test
 {
-    auto mockCLInfo = std::make_shared<CLInfoMock>();
-    std::vector<cl::Device> devices = {cl::Device(), cl::Device()};
+protected:
+    std::shared_ptr<CLInfoMock> mockCLInfo;
+    
+    void SetUp() override
+    {
+        mockCLInfo = std::make_shared<CLInfoMock>();
+    }
+};
 
-    EXPECT_CALL(*mockCLInfo, GetDevices()).Times(2).WillRepeatedly(Return(devices));
-    EXPECT_CALL(*mockCLInfo, GetDevicePowerIndex(_))
-        .WillOnce(Return(10))
-        .WillOnce(Return(20))
-        .WillOnce(Return(10))
-        .WillOnce(Return(20))
-        .WillOnce(Return(20))
-        .WillOnce(Return(20));
-    EXPECT_CALL(*mockCLInfo, GetDeviceDescription(_)).WillOnce(Return(""));
+} // namespace
+
+TEST_F(DiagnosticsTest, SelectDeviceBasedOnPowerIndexDuringTheCreation)
+{
+    EXPECT_CALL(*mockCLInfo, GetDevices()).WillOnce(Return(GetTestDevices()));
+    
+    auto diagnostics = CreateDiagnostics(mockCLInfo);
+
+    ASSERT_TRUE(diagnostics->GetDevice().has_value());
+    EXPECT_EQ(diagnostics->GetDevice().value().GetID(), deviceID2);
+}
+
+TEST_F(DiagnosticsTest, SelectDeviceBasedOnPowerIndex)
+{
+    EXPECT_CALL(*mockCLInfo, GetDevices()).Times(2).WillRepeatedly(Return(GetTestDevices()));
+    
     auto diagnostics = CreateDiagnostics(mockCLInfo);
     diagnostics->SetOpenCLDevice(0);
+
+    ASSERT_TRUE(diagnostics->GetDevice().has_value());
+    EXPECT_EQ(diagnostics->GetDevice().value().GetID(), deviceID2);
 }
 
-TEST(DiagnosticsTest, SelectDeviceBasedOnExistingIndex)
+TEST_F(DiagnosticsTest, SelectDeviceBasedOnExistingIndex)
 {
-    auto mockCLInfo = std::make_shared<CLInfoMock>();
-    std::vector<cl::Device> devices = {cl::Device(), cl::Device()};
+    EXPECT_CALL(*mockCLInfo, GetDevices()).Times(2).WillRepeatedly(Return(GetTestDevices()));
 
-    EXPECT_CALL(*mockCLInfo, GetDevices()).Times(2).WillRepeatedly(Return(devices));
-    EXPECT_CALL(*mockCLInfo, GetDevicePowerIndex(_)).WillOnce(Return(10)).WillOnce(Return(20));
-    EXPECT_CALL(*mockCLInfo, GetDeviceID(_)).WillOnce(Return(3138399603)).WillOnce(Return(2027288592));
-    EXPECT_CALL(*mockCLInfo, GetDeviceDescription(_)).Times(2).WillRepeatedly(Return(""));
     auto diagnostics = CreateDiagnostics(mockCLInfo);
-    diagnostics->SetOpenCLDevice(2027288592);
+    diagnostics->SetOpenCLDevice(12345678);
+
+    ASSERT_TRUE(diagnostics->GetDevice().has_value());
+    EXPECT_EQ(diagnostics->GetDevice().value().GetID(), deviceID1);
 }
 
-TEST(DiagnosticsTest, SelectDeviceBasedOnNonExistingIndex)
+TEST_F(DiagnosticsTest, SelectDeviceBasedOnNonExistingIndex)
 {
-    auto mockCLInfo = std::make_shared<CLInfoMock>();
-    std::vector<cl::Device> devices = {cl::Device(), cl::Device()};
-
-    EXPECT_CALL(*mockCLInfo, GetDevices()).Times(2).WillRepeatedly(Return(devices));
-    EXPECT_CALL(*mockCLInfo, GetDeviceID(_)).WillOnce(Return(3138399603)).WillOnce(Return(2027288592));
-    EXPECT_CALL(*mockCLInfo, GetDevicePowerIndex(_))
-        .WillOnce(Return(10))
-        .WillOnce(Return(20))
-        .WillOnce(Return(10))
-        .WillOnce(Return(20))
-        .WillOnce(Return(20))
-        .WillOnce(Return(20));
-    EXPECT_CALL(*mockCLInfo, GetDeviceDescription(_)).WillOnce(Return(""));
+    EXPECT_CALL(*mockCLInfo, GetDevices()).Times(2).WillRepeatedly(Return(GetTestDevices()));
 
     auto diagnostics = CreateDiagnostics(mockCLInfo);
-    diagnostics->SetOpenCLDevice(static_cast<uint32_t>(4527288514));
+    diagnostics->SetOpenCLDevice(10000000);
+
+    ASSERT_TRUE(diagnostics->GetDevice().has_value());
+    EXPECT_EQ(diagnostics->GetDevice().value().GetID(), deviceID2);
 }

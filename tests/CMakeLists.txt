@@ -41,6 +41,9 @@ target_compile_definitions(${TESTS_PROJECT_NAME} PRIVATE
 )
 endif()
 
+target_compile_definitions(${TESTS_PROJECT_NAME} PRIVATE 
+    ENABLE_TESTING=1
+)
 target_link_libraries (${TESTS_PROJECT_NAME} ${libs})
 target_include_directories(${TESTS_PROJECT_NAME} PRIVATE 
     "${PROJECT_SOURCE_DIR}/include"

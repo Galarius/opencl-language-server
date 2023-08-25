@@ -10,6 +10,7 @@
 #include "utils.hpp"
 
 #include <array>
+#include <sstream>
 #include <unordered_map>
 
 using namespace nlohmann;
@@ -446,6 +447,80 @@ json GetPlatformJSONInfo(const cl::Platform& platform)
     return info;
 }
 
+std::vector<cl::Platform> GetPlatforms()
+{
+    logger()->trace("Searching for OpenCL platforms...");
+    std::vector<cl::Platform> platforms;
+    try
+    {
+        cl::Platform::get(&platforms);
+        logger()->trace("Found OpenCL platforms: {}", platforms.size());
+    }
+    catch (cl::Error& err)
+    {
+        logger()->error("Failed to find OpenCL platforms, {}", err.what());
+    }
+    return platforms;
+}
+
+std::string GetPlatformDescription(const cl::Platform& platform)
+{
+    try
+    {
+        auto name = platform.getInfo<CL_PLATFORM_NAME>();
+        auto vendor = platform.getInfo<CL_PLATFORM_VENDOR>();
+        auto version = platform.getInfo<CL_PLATFORM_VERSION>();
+        auto profile = platform.getInfo<CL_PLATFORM_PROFILE>();
+        auto description = "name: " + std::move(name) + "; " + "vendor: " + std::move(vendor) + "; " +
+            "version: " + std::move(version) + "; " + "profile: " + std::move(profile);
+        return description;
+    }
+    catch (cl::Error& err)
+    {
+        logger()->error("Failed to get the platform's description, {}", err.what());
+    }
+    return "unknown";
+}
+
+size_t GetDevicePowerIndex(const cl::Device& device)
+{
+    try
+    {
+        const size_t maxComputeUnits = device.getInfo<CL_DEVICE_MAX_COMPUTE_UNITS>();
+        const size_t maxClockFrequency = device.getInfo<CL_DEVICE_MAX_CLOCK_FREQUENCY>();
+        return maxComputeUnits * maxClockFrequency;
+    }
+    catch (const cl::Error& err)
+    {
+        logger()->error("Failed to get the device's power index, {}", err.what());
+    }
+    return 0;
+}
+
+std::string GetDeviceDescription(const cl::Device& device)
+{
+    try
+    {
+        auto name = device.getInfo<CL_DEVICE_NAME>();
+        auto type = device.getInfo<CL_DEVICE_TYPE>();
+        auto version = device.getInfo<CL_DEVICE_VERSION>();
+        auto vendor = device.getInfo<CL_DEVICE_VENDOR>();
+        auto vendorID = device.getInfo<CL_DEVICE_VENDOR_ID>();
+        auto driverVersion = device.getInfo<CL_DRIVER_VERSION>();
+        auto description = "name: " + std::move(name) + "; " + "type: " + std::to_string(type) + "; " +
+            "version: " + std::move(version) + "; " + "vendor: " + std::move(vendor) + "; " +
+            "vendorID: " + std::to_string(vendorID) + "; " + "driverVersion: " + std::move(driverVersion);
+        return description;
+    }
+    catch (cl::Error& err)
+    {
+        logger()->error("Failed to get the device's description, {}", err.what());
+    }
+    return "unknown";
+}
+
+// --- CLInfo ---
+
 class CLInfo final : public ICLInfo
 {
 public:
@@ -467,114 +542,46 @@ public:
         return nlohmann::json {{"PLATFORMS", jsonPlatforms}};
     }
 
-    std::vector<cl::Platform> GetPlatforms()
-    {
-        logger()->trace("Searching for OpenCL platforms...");
-        std::vector<cl::Platform> platforms;
-        try
-        {
-            cl::Platform::get(&platforms);
-            logger()->trace("Found OpenCL platforms: {}", platforms.size());
-        }
-        catch (cl::Error& err)
-        {
-            logger()->error("Failed to find OpenCL platforms, {}", err.what());
-        }
-        return platforms;
-    }
 
-    std::string GetPlatformDescription(const cl::Platform& platform)
+    std::vector<ocls::Device> GetDevices()
     {
-        try
-        {
-            auto name = platform.getInfo<CL_PLATFORM_NAME>();
-            auto vendor = platform.getInfo<CL_PLATFORM_VENDOR>();
-            auto version = platform.getInfo<CL_PLATFORM_VERSION>();
-            auto profile = platform.getInfo<CL_PLATFORM_PROFILE>();
-            auto description = "name: " + std::move(name) + "; " + "vendor: " + std::move(vendor) + "; " +
-                "version: " + std::move(version) + "; " + "profile: " + std::move(profile);
-            return description;
-        }
-        catch (cl::Error& err)
-        {
-            logger()->error("Failed to get the platform's description, {}", err.what());
-        }
-        return "unknown";
-    }
-
-    std::vector<cl::Device> GetDevices()
-    {
-        std::vector<cl::Device> devices;
-        auto platforms = GetPlatforms();
-        for (auto& platform : platforms)
+        std::vector<ocls::Device> devices;
+        const auto platforms = GetPlatforms();
+        for (const auto& platform : platforms)
         {
             logger()->trace("Platform {}", GetPlatformDescription(platform));
             logger()->trace("Searching for platform's devices...");
+
             try
             {
                 std::vector<cl::Device> platformDevices;
                 platform.getDevices(CL_DEVICE_TYPE_ALL, &platformDevices);
+
                 if (logger()->level() <= spdlog::level::trace)
                 {
-                    logger()->trace("Found OpenCL devices: {}", platformDevices.size());
-                    for (auto& device : platformDevices)
+                    std::stringstream traceLog;
+                    traceLog << "Found OpenCL devices: " << platformDevices.size() << "\n";
+                    for (const auto& device : platformDevices)
                     {
-                        logger()->trace("Device {}", GetDeviceDescription(device));
+                        traceLog << "Device " << GetDeviceDescription(device) << "\n";
                     }
+                    logger()->trace(traceLog.str());
                 }
-                devices.insert(
-                    devices.end(),
-                    std::make_move_iterator(platformDevices.begin()),
-                    std::make_move_iterator(platformDevices.end()));
+
+                auto deviceToOclsDevice = [](const cl::Device& device) {
+                    return ocls::Device(
+                        device, CalculateDeviceID(device), GetDeviceDescription(device), GetDevicePowerIndex(device));
+                };
+
+                std::transform(
+                    platformDevices.begin(), platformDevices.end(), std::back_inserter(devices), deviceToOclsDevice);
             }
-            catch (cl::Error& err)
+            catch (const cl::Error& err)
             {
                 logger()->error("Failed to find the platform's devices, {}", err.what());
             }
         }
         return devices;
-    }
-
-    uint32_t GetDeviceID(const cl::Device& device)
-    {
-        return CalculateDeviceID(device);
-    }
-
-    std::string GetDeviceDescription(const cl::Device& device)
-    {
-        try
-        {
-            auto name = device.getInfo<CL_DEVICE_NAME>();
-            auto type = device.getInfo<CL_DEVICE_TYPE>();
-            auto version = device.getInfo<CL_DEVICE_VERSION>();
-            auto vendor = device.getInfo<CL_DEVICE_VENDOR>();
-            auto vendorID = device.getInfo<CL_DEVICE_VENDOR_ID>();
-            auto driverVersion = device.getInfo<CL_DRIVER_VERSION>();
-            auto description = "name: " + std::move(name) + "; " + "type: " + std::to_string(type) + "; " +
-                "version: " + std::move(version) + "; " + "vendor: " + std::move(vendor) + "; " +
-                "vendorID: " + std::to_string(vendorID) + "; " + "driverVersion: " + std::move(driverVersion);
-            return description;
-        }
-        catch (cl::Error& err)
-        {
-            logger()->error("Failed to get the device's description, {}", err.what());
-        }
-        return "unknown";
-    }
-
-    size_t GetDevicePowerIndex(const cl::Device& device)
-    {
-        try
-        {
-            const size_t maxComputeUnits = device.getInfo<CL_DEVICE_MAX_COMPUTE_UNITS>();
-            const size_t maxClockFrequency = device.getInfo<CL_DEVICE_MAX_CLOCK_FREQUENCY>();
-            return maxComputeUnits * maxClockFrequency;
-        }
-        catch (const cl::Error& err)
-        {
-            logger()->error("Failed to get the device's power index, {}", err.what());
-        }
-        return 0;
     }
 };
 
