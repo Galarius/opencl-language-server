@@ -32,6 +32,7 @@ test_package/*
 .build*
 
 ## VS Code
+.vs
 .vscode
 CMakePresets.json
 
