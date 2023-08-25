@@ -526,19 +526,16 @@ class CLInfo final : public ICLInfo
 public:
     nlohmann::json json()
     {
-        const auto platforms = GetPlatforms();
-        if (platforms.size() == 0)
-        {
-            return {};
-        }
-
         std::vector<nlohmann::json> jsonPlatforms;
-        for (const auto& platform : platforms)
+        const auto platforms = GetPlatforms();
+        if (platforms.size() > 0)
         {
-            logger()->trace("{}", GetPlatformDescription(platform));
-            jsonPlatforms.emplace_back(GetPlatformJSONInfo(platform));
+            for (const auto& platform : platforms)
+            {
+                logger()->trace("{}", GetPlatformDescription(platform));
+                jsonPlatforms.emplace_back(GetPlatformJSONInfo(platform));
+            }
         }
-
         return nlohmann::json {{"PLATFORMS", jsonPlatforms}};
     }
 
