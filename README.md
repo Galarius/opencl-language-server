@@ -1,5 +1,7 @@
 # OpenCL Language Server
 
+![Build status](https://github.com/galarius/opencl-language-server/actions/workflows/build.yml/badge.svg)
+
 ## Supported Capabilities:
 
 - [x] `textDocument/publishDiagnostics`
@@ -35,7 +37,7 @@ You can configure diagnostics with `json-rpc` request during the intitialization
 | --- | --- |
 | `buildOptions` | Options to be utilized when building the program. The list of [supported](https://registry.khronos.org/OpenCL/sdk/2.1/docs/man/xhtml/clBuildProgram.html) build options. |
 | `deviceID` | Device ID or 0 (automatic selection) of the OpenCL device to be used for diagnostics. |
-| |  *Run `./opencl-language-server --clinfo` to get information about available OpenCL devices including identifiers.* |
+| |  *Run `./opencl-language-server clinfo` to get information about available OpenCL devices including identifiers.* |
 | `maxNumberOfProblems` | Controls the maximum number of errors parsed by the language server. |
 
 ## Development
