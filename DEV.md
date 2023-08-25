@@ -60,3 +60,25 @@ xcrun altool --notarize-app --primary-bundle-id "com.${AUTHOR}.opencl-language-s
 xcrun altool --notarization-history 0 --asc-provider ${PROVIDER} --password "@keychain:AC_PASSWORD"
 xcrun altool --notarization-info ${REQUEST_ID} --password "@keychain:AC_PASSWORD"
 ```
+
+### CLI
+
+The `opencl-language-server` offers support for file logging, as well as subcommands that allow you to test its functionality without starting the server.
+
+```
+Usage: opencl-language-server [OPTIONS] [SUBCOMMAND]
+
+Options:
+  -h,--help                   Print this help message and exit
+  -e,--enable-file-logging    Enable file logging
+  -f,--log-file TEXT [opencl-language-server.log] 
+                              Path to log file
+  -l,--log-level ENUM:{0,1,2,3,4,5} [0] 
+                              Log level
+  --stdio                     Use stdio transport channel for the language server
+  -v,--version                Show version
+
+Subcommands:
+  clinfo                      Show information about available OpenCL devices
+  diagnostics                 Provides an OpenCL kernel diagnostics
+```
