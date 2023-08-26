@@ -16,6 +16,7 @@ class Conan(Wrapper):
                 ".",
                 "--update",
                 f"--output-folder={install_folder}",
+                "--deployer=licenses",
                 *self.__get_configuration_args(host_profile, build_profile, with_tests),
             ],
             check=True,
@@ -42,7 +43,7 @@ class Conan(Wrapper):
             args.extend(
                 [
                     "-o",
-                    "opencl_language_server/*:enable_testing=True",
+                    "opencl-language-server/*:enable_testing=True",
                 ]
             )
         return args

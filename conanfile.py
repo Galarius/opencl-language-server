@@ -9,7 +9,7 @@ import os
 
 
 class OpenCLLanguageServerConanfile(ConanFile):
-    name = "opencl_language_server"
+    name = "opencl-language-server"
     description = "OpenCL Language Server"
     package_type = "application"
     license = "MIT"
@@ -24,7 +24,7 @@ class OpenCLLanguageServerConanfile(ConanFile):
         "nlohmann_json/[^3.11.2]",
         "opencl-clhpp-headers/2022.09.30",
         "spdlog/[^1.11.0]",
-        "uriparser/[^0.9.7]"
+        "uriparser/[^0.9.7]",
     )
     exports_sources = (
         "include/**",
@@ -77,7 +77,7 @@ class OpenCLLanguageServerConanfile(ConanFile):
         bin_ext = ".exe" if self.settings.os == "Windows" else ""
         copy(
             self,
-            f"opencl-language-server{bin_ext}",
+            f"{self.name}{bin_ext}",
             build_folder,
             os.path.join(self.package_folder, "bin"),
         )
@@ -94,6 +94,6 @@ class OpenCLLanguageServerConanfile(ConanFile):
 
         bin_ext = ".exe" if self.settings.os == "Windows" else ""
         opencl_ls_bin = os.path.join(
-            self.package_folder, "bin", f"opencl-language-server{bin_ext}"
+            self.package_folder, "bin", f"{self.name}{bin_ext}"
         ).replace("\\", "/")
         self.runenv_info.define_path("OPENCL_LANGUAGE_SERVER", opencl_ls_bin)
