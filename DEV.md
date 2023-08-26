@@ -14,7 +14,7 @@ conan profile detect
 
 | | |
 |---|---|
-| `./build.py conan-install` | Install dependencies |
+| `./build.py conan-install` | Install dependencies and gathers licenses|
 | `./build.py configure` | Configure the project |
 | `./build.py` | Build the project |
 | `./build.py conan-create` | Create the package |
