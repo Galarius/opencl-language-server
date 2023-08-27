@@ -171,7 +171,6 @@ void Diagnostics::SetOpenCLDevice(uint32_t identifier)
     auto selectedDevice = SelectOpenCLDevice(devices, identifier);
     if (!selectedDevice)
     {
-        logger()->warn("No suitable OpenCL device was found");
         return;
     }
 
