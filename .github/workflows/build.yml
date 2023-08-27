@@ -76,3 +76,6 @@ jobs:
     - name: Conan Create
       run: |
         python3 build.py conan-create
+
+# TODO: cache prebuilt libraries like in 
+# https://github.com/cristianadam/qt5/blob/eb958d8c1a9d22ebc94502fc30d56e77dbebb580/.github/workflows/qmake_build.yml#L83

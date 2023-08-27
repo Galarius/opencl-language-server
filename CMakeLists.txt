@@ -29,6 +29,10 @@ if(MSVC)
     add_compile_options(/WX /W4 /EHsc)
 else()
     add_compile_options(-Wall -Wextra -Wpedantic -Wimplicit-fallthrough -Werror)
+    if(LINUX)
+        # Prebuilt Clang and LLVM static libraries are position-dependent 
+        add_link_options(-no-pie)
+    endif()
 endif()
 
 message(STATUS "Build Configuration")
@@ -48,6 +52,8 @@ find_package(spdlog REQUIRED)
 find_package(nlohmann_json REQUIRED)
 find_package(CLI11 REQUIRED)
 find_package(uriparser REQUIRED)
+
+add_subdirectory(libclang)
 
 if(ENABLE_TESTING)
     find_package(GTest REQUIRED)
@@ -79,13 +85,13 @@ list(TRANSFORM sources PREPEND "${CMAKE_CURRENT_SOURCE_DIR}/src/")
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/include/version.hpp.in version.hpp)
 source_group("include" FILES ${headers})
 source_group("src" FILES ${sources})
-set(libs nlohmann_json::nlohmann_json spdlog::spdlog OpenCL::HeadersCpp CLI11::CLI11 uriparser::uriparser)
+set(conan_libs nlohmann_json::nlohmann_json spdlog::spdlog OpenCL::HeadersCpp CLI11::CLI11 uriparser::uriparser)
 if(LINUX)
-    set(libs ${libs} stdc++fs OpenCL::OpenCL)
+    set(conan_libs ${conan_libs} stdc++fs OpenCL::OpenCL)
 elseif(APPLE)
-    set(libs ${libs} ${OpenCL_LIBRARIES})
+    set(conan_libs ${conan_libs} ${OpenCL_LIBRARIES})
 elseif(WIN32)
-    set(libs ${libs} OpenCL::OpenCL)
+    set(conan_libs ${conan_libs} OpenCL::OpenCL)
 endif()
 
 add_executable (${PROJECT_NAME} ${sources} ${headers})
@@ -107,7 +113,7 @@ target_compile_definitions(${PROJECT_NAME} PRIVATE
 endif()
 
 
-target_link_libraries(${PROJECT_NAME} ${libs})
+target_link_libraries(${PROJECT_NAME} ${conan_libs} libclang-imported)
 target_include_directories(${PROJECT_NAME} PRIVATE 
     "${PROJECT_SOURCE_DIR}/include"
     ${CMAKE_CURRENT_BINARY_DIR}

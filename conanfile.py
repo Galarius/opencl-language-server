@@ -17,8 +17,8 @@ class OpenCLLanguageServerConanfile(ConanFile):
     topics = ("opencl", "language-server")
     settings = "os", "compiler", "build_type", "arch"
     generators = "CMakeToolchain", "CMakeDeps"
-    options = {"fPIC": [True, False], "enable_testing": [True, False]}
-    default_options = {"fPIC": True, "enable_testing": False}
+    options = {"enable_testing": [True, False]}
+    default_options = {"enable_testing": False}
     requires = (
         "cli11/[^2.3.2]",
         "nlohmann_json/[^3.11.2]",
@@ -28,6 +28,7 @@ class OpenCLLanguageServerConanfile(ConanFile):
     )
     exports_sources = (
         "include/**",
+        "libclang/**",
         "src/**",
         "tests/**",
         "CMakeLists.txt",
@@ -49,10 +50,6 @@ class OpenCLLanguageServerConanfile(ConanFile):
 
     def validate(self):
         check_min_cppstd(self, 17)
-
-    def config_options(self):
-        if self.settings.os == "Windows":
-            del self.options.fPIC
 
     def layout(self):
         cmake_layout(self)

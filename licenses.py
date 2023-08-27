@@ -2,10 +2,12 @@
 # Execute "conan install . --output-folder=.conan-install --deployer=licenses --build=missing"
 # or use "./build.py conan-install"
 
-from conan.tools.files import load, copy
+from conan.tools.files import load, copy, download
 from pathlib import Path
 import logging
 
+llvm_version = "15.0.0"
+llvm_license_url = f"https://raw.githubusercontent.com/llvm/llvm-project/llvmorg-{llvm_version}/clang/LICENSE.TXT"
 
 def deploy(graph, output_folder, **kwargs):
     licenses_dir = Path(output_folder) / "licenses"
@@ -22,3 +24,7 @@ def deploy(graph, output_folder, **kwargs):
     ocls_output.mkdir(exist_ok=True, parents=True)
     logging.info(f"Copy '{root_dir}/LICENSE' to '{ocls_output}'")
     copy(graph.root.conanfile, "LICENSE", root_dir, ocls_output)
+
+    llvm_output = licenses_dir / "llvm" / llvm_version
+    llvm_output.mkdir(exist_ok=True, parents=True)
+    download(graph.root.conanfile, llvm_license_url, llvm_output / "LICENSE.TXT")
