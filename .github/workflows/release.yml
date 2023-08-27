@@ -181,4 +181,20 @@ jobs:
           asset_path: ${{github.workspace}}/.build-universal/opencl-language-server-darwin-universal.tar.gz
           asset_name: opencl-language-server-darwin-universal.tar.gz
           asset_content_type: application/gzip
+      
+      - name: Linux - Archive Licenses
+        if: "contains(matrix.config.os, 'ubuntu')"
+        run: | 
+          cd ${{github.workspace}}/.conan-install
+          tar -czvf licenses.tar.gz licenses
 
+      - name: Linux - Upload Licenses
+        if: "contains(matrix.config.os, 'ubuntu')"
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{github.token}}
+        with:
+          upload_url: ${{needs.create_release.outputs.upload_url}}
+          asset_path: ${{github.workspace}}/.conan-install/licenses.tar.gz
+          asset_name: licenses.tar.gz
+          asset_content_type: application/gzip
