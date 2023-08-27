@@ -10,6 +10,7 @@
 #include "log.hpp"
 #include "utils.hpp"
 
+#include <clang-c/Index.h>
 #include <filesystem>
 #include <iostream>
 #include <optional>
@@ -258,6 +259,8 @@ std::optional<ocls::Device> Diagnostics::SelectOpenCLDevice(
 
 std::string Diagnostics::BuildSource(const std::string& source) const
 {
+    clang_createIndex(0, 0); // tmp
+
     if (!m_device.has_value())
     {
         throw std::runtime_error("missing OpenCL device");
