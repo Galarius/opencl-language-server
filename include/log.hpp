@@ -5,6 +5,8 @@
 //  Created by Ilia Shoshin on 20/08/23.
 //
 
+#pragma once
+
 #include <string>
 #include <spdlog/spdlog.h>
 

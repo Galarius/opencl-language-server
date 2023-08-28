@@ -5,6 +5,8 @@
 //  Created by Ilia Shoshin on 14/8/23.
 //
 
+#pragma once
+
 #include "clinfo.hpp"
 
 #include <gmock/gmock.h>
