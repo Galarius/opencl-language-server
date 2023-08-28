@@ -5,6 +5,8 @@
 //  Created by Ilia Shoshin on 7/25/23.
 //
 
+#pragma once
+
 #include "diagnostics.hpp"
 
 #include <gmock/gmock.h>

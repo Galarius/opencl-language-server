@@ -5,6 +5,7 @@
 //  Created by Ilia Shoshin on 7/30/23.
 //
 
+#pragma once
 
 #include "utils.hpp"
 
