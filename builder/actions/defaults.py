@@ -14,7 +14,7 @@ class Defaults(object):
     machine = _uname.machine.lower()
     debug_build_type = "Debug"
     release_build_type = "Release"
-    default_build_types = debug_build_type
+    default_build_types = release_build_type
     supported_build_types = [debug_build_type, release_build_type]
     output_folder = ".conan-install"
     build_folder = ".build"
