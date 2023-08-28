@@ -71,13 +71,24 @@ jobs:
           pip3 install -r requirements.txt
           conan profile detect
 
+      # The following step is copied from the build.yml.
+      # TODO: reuse it
+      - name: Cache libclang
+        id: cache-libclang
+        uses: actions/cache@v3
+        env:
+          cache-name: cache-libclang
+        with:
+          path: .build/_deps/libclang-subbuild/libclang-populate-prefix/src/*.7z
+          key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('libclang/libclang-urls.txt') }}
+
 
       - name: Windows - Configure & Build (Release)
         if: "contains(matrix.config.os, 'windows')"
         run: |
-          python3 build.py conan-install -pr:h=profiles/windows.release.x86_64
-          python3 build.py configure -t .conan-install/build/generators/conan_toolchain.cmake -bt Release
-          python3 build.py build -bt Release
+          python3 build.py conan-install
+          python3 build.py configure
+          python3 build.py build
 
       - name: Windows - Archive Artifact
         if: "contains(matrix.config.os, 'windows')"
@@ -100,8 +111,8 @@ jobs:
       - name: Linux - Configure & Build (Release)
         if: "contains(matrix.config.os, 'ubuntu')"
         run: |
-          ./build.py conan-install -pr:h=profiles/linux.release.x86_64
-          ./build.py configure -t .conan-install/build/Release/generators/conan_toolchain.cmake -bt Release
+          ./build.py conan-install
+          ./build.py configure
           ./build.py build
 
       - name: Linux - Archive Artifact
