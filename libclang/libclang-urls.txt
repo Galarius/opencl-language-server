@@ -1,0 +1,3 @@
+APPLE;https://download.qt.io/development_releases/prebuilt/libclang/qt/libclang-release_15.0.0-based-mac.7z;8a944b4b65d2dca883fe539af5e5eef9a67e2abca91b28258fb08c46e3bb05b6
+WIN32;https://download.qt.io/development_releases/prebuilt/libclang/qt/libclang-release_15.0.0-based-windows-vs2019_64.7z;3cd73b31be503ec7281f1f8907f95392d1c8bd0a8c2c92c39dc177f8c3d02baf
+LINUX;https://download.qt.io/development_releases/prebuilt/libclang/qt/libclang-release_15.0.0-based-linux-Ubuntu20.04-gcc9.3-x86_64.7z;0cfdf3387b8917e99fbd81358a142daeb3bcb84c107c96f1508f257ee2082bda
