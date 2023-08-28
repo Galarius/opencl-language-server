@@ -2,33 +2,12 @@
 # add_subdirectory(libclang)
 # target_link_libraries(${TARGET} libclang-imported)
 
-if(WIN32)
-  if(CMAKE_VS_PLATFORM_NAME STREQUAL "x64")
-    set(DIA_PLATFORM_NAME "amd64")
-  else()
-    set(DIA_PLATFORM_NAME "")
-  endif()
-
-  find_library(
-    diasdk_lib
-    NAMES diaguids.lib
-    PATH_SUFFIXES "lib/${DIA_PLATFORM_NAME}"
-    HINTS "$ENV{VSINSTALLDIR}/DIA SDK" "${CMAKE_GENERATOR_INSTANCE}/DIA SDK")
-
-  message(STATUS "diasdk_lib: ${diasdk_lib}")
-endif()
-
 # Define -DLLVM_ROOT_DIR=<path> if you have previously downloaded libclang manually
 if(DEFINED LLVM_ROOT_DIR AND NOT LLVM_ROOT_DIR STREQUAL "")
   # LLVM_ROOT_DIR is already defined
 else()
-
   # Download prebuilt static llvm & clang libraries
-  include(FetchContent)
-  set(FETCHCONTENT_QUIET OFF)
-
   file(STRINGS ${CMAKE_CURRENT_SOURCE_DIR}/libclang-urls.txt libclang_entries)
-
   message(STATUS "Parsing ${CMAKE_CURRENT_SOURCE_DIR}/libclang-urls.txt...")
   foreach(entry ${libclang_entries})
     # Parse platform, URL, and hash
@@ -54,6 +33,9 @@ else()
   message(STATUS "LIBCLANG URL: ${libclang_url}")
   message(STATUS "LIBCLANG HASH: ${libclang_hash}")
 
+  include(FetchContent)
+  set(FETCHCONTENT_QUIET OFF)
+
   FetchContent_Declare(libclang
       SOURCE_DIR prebuild
       DOWNLOAD_EXTRACT_TIMESTAMP TRUE
@@ -76,10 +58,21 @@ include(ClangConfig)
 
 if(WIN32)
   # Workaround to replace the hardcoded path to diaguids.lib
-  
-  if(EXISTS ${diasdk_lib})
-    # Pass
+  if(CMAKE_VS_PLATFORM_NAME STREQUAL "x64")
+    set(DIA_PLATFORM_NAME "amd64")
   else()
+    set(DIA_PLATFORM_NAME "")
+  endif()
+
+  find_library(
+    diasdk_lib
+    NAMES diaguids.lib
+    PATH_SUFFIXES "lib/${DIA_PLATFORM_NAME}"
+    HINTS "$ENV{VSINSTALLDIR}/DIA SDK" "${CMAKE_GENERATOR_INSTANCE}/DIA SDK")
+
+  message(STATUS "diasdk_lib: ${diasdk_lib}")
+
+  if(NOT EXISTS ${diasdk_lib})
     message(FATAL_ERROR "The file ${diasdk_lib} does not exist")
   endif()
   
@@ -94,7 +87,6 @@ if(WIN32)
   )
   message(STATUS "LLVMDebugInfoPDB: ${link_libraries}")
 endif()
-
 
 message(STATUS "LLVM targets to build: ${LLVM_TARGETS_TO_BUILD}")
 message(STATUS "LLVM native arch: ${LLVM_NATIVE_ARCH}")
