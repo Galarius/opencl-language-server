@@ -24,27 +24,42 @@ if(DEFINED LLVM_ROOT_DIR AND NOT LLVM_ROOT_DIR STREQUAL "")
 else()
 
   # Download prebuilt static llvm & clang libraries
-
   include(FetchContent)
   set(FETCHCONTENT_QUIET OFF)
 
-  if(APPLE)
-    set(LIBCLANG_URL "https://download.qt.io/development_releases/prebuilt/libclang/qt/libclang-release_15.0.0-based-mac.7z")
-    set(LIBCLANG_HASH "8a944b4b65d2dca883fe539af5e5eef9a67e2abca91b28258fb08c46e3bb05b6")
-  elseif(WIN32)
-    set(LIBCLANG_URL "https://download.qt.io/development_releases/prebuilt/libclang/qt/libclang-release_15.0.0-based-windows-vs2019_64.7z")
-    set(LIBCLANG_HASH "3cd73b31be503ec7281f1f8907f95392d1c8bd0a8c2c92c39dc177f8c3d02baf")
-  else()
-    set(LIBCLANG_URL "https://download.qt.io/development_releases/prebuilt/libclang/qt/libclang-release_15.0.0-based-linux-Ubuntu20.04-gcc9.3-x86_64.7z")
-    set(LIBCLANG_HASH "0cfdf3387b8917e99fbd81358a142daeb3bcb84c107c96f1508f257ee2082bda")
-  endif()
+  file(STRINGS ${CMAKE_CURRENT_SOURCE_DIR}/libclang-urls.txt libclang_entries)
+
+  message(STATUS "Parsing ${CMAKE_CURRENT_SOURCE_DIR}/libclang-urls.txt...")
+  foreach(entry ${libclang_entries})
+    # Parse platform, URL, and hash
+    list(GET entry 0 platform)
+    list(GET entry 1 url_value)
+    list(GET entry 2 hash_value)
+
+    if(platform STREQUAL "APPLE" AND APPLE)
+      set(libclang_url ${url_value})
+      set(libclang_hash ${hash_value})
+      break()
+    elseif(platform STREQUAL "WIN32" AND WIN32)
+      set(libclang_url ${url_value})
+      set(libclang_hash ${hash_value})
+      break()
+    elseif(platform STREQUAL "LINUX" AND LINUX)
+      set(libclang_url ${url_value})
+      set(libclang_hash ${hash_value})
+      break()
+    endif()
+  endforeach()
+
+  message(STATUS "LIBCLANG URL: ${libclang_url}")
+  message(STATUS "LIBCLANG HASH: ${libclang_hash}")
 
   FetchContent_Declare(libclang
       SOURCE_DIR prebuild
       DOWNLOAD_EXTRACT_TIMESTAMP TRUE
       TLS_VERIFY TRUE
-      URL ${LIBCLANG_URL}
-      URL_HASH SHA256=${LIBCLANG_HASH}
+      URL ${libclang_url}
+      URL_HASH SHA256=${libclang_hash}
     )
     FetchContent_MakeAvailable(libclang)
     set(LLVM_ROOT_DIR ${libclang_SOURCE_DIR})
