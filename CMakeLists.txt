@@ -53,8 +53,7 @@ find_package(nlohmann_json REQUIRED)
 find_package(CLI11 REQUIRED)
 find_package(uriparser REQUIRED)
 
-# libclang is not currently used, uncomment when needed (#17, #24)
-# add_subdirectory(libclang)
+add_subdirectory(libclang)
 
 if(ENABLE_TESTING)
     find_package(GTest REQUIRED)
@@ -114,9 +113,7 @@ target_compile_definitions(${PROJECT_NAME} PRIVATE
 endif()
 
 
-target_link_libraries(${PROJECT_NAME} ${conan_libs} 
-    # libclang-imported
-)
+target_link_libraries(${PROJECT_NAME} ${conan_libs} libclang-imported)
 target_include_directories(${PROJECT_NAME} PRIVATE 
     "${PROJECT_SOURCE_DIR}/include"
     ${CMAKE_CURRENT_BINARY_DIR}
