@@ -16,7 +16,7 @@ class OpenCLLanguageServerConanfile(ConanFile):
     homepage = "https://github.com/Galarius/opencl-language-server"
     topics = ("opencl", "language-server")
     settings = "os", "compiler", "build_type", "arch"
-    generators = "CMakeToolchain", "CMakeDeps"
+    generators = "CMakeToolchain", "CMakeDeps", "VirtualBuildEnv"
     options = {"enable_testing": [True, False]}
     default_options = {"enable_testing": False}
     requires = (

@@ -61,7 +61,20 @@ xcrun altool --notarization-history 0 --asc-provider ${PROVIDER} --password "@ke
 xcrun altool --notarization-info ${REQUEST_ID} --password "@keychain:AC_PASSWORD"
 ```
 
-### CLI
+## Linux
+
+### Cross compilation (x86_64 -> armv8)
+
+```shell
+sudo apt install gcc-9-aarch64-linux-gnu g++-9-aarch64-linux-gnu
+./build.py conan-install -o .conan-armv8 -pr:h profiles/linux.release.armv8
+./build.py configure -t .conan-armv8/build/Release/generators/conan_toolchain.cmake -b .build-armv8 -bt Release
+./build.py build -b .build-armv8
+```
+
+*ubuntu-20.04, gcc-9*
+
+## CLI
 
 The `opencl-language-server` offers support for file logging, as well as subcommands that allow you to test its functionality without starting the server.
 

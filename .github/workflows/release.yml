@@ -47,7 +47,8 @@ jobs:
         if: "contains(matrix.config.os, 'ubuntu')"
         run: |
           sudo apt update
-          sudo apt install gcc-11 g++-11
+          sudo apt install gcc-9-aarch64-linux-gnu g++-9-aarch64-linux-gnu
+          ls /usr/bin/ | grep aarch64
 
       - name: Set up Python
         uses: actions/setup-python@v2
@@ -111,25 +112,45 @@ jobs:
       - name: Linux - Configure & Build (Release)
         if: "contains(matrix.config.os, 'ubuntu')"
         run: |
-          ./build.py conan-install
-          ./build.py configure
-          ./build.py build
+          ./build.py conan-install -o .conan-x86_64 -pr:h profiles/linux.release.x86_64
+          ./build.py configure -t .conan-x86_64/build/Release/generators/conan_toolchain.cmake -b .build-x86_64 -bt Release
+          ./build.py build -b .build-x86_64
+          file .build-x86_64/opencl-language-server
+
+          ./build.py conan-install -o .conan-armv8 -pr:h profiles/linux.release.armv8
+          ./build.py configure -t .conan-armv8/build/Release/generators/conan_toolchain.cmake -b .build-armv8 -bt Release
+          ./build.py build -b .build-armv8
+          file .build-armv8/opencl-language-server
 
       - name: Linux - Archive Artifact
         if: "contains(matrix.config.os, 'ubuntu')"
         run: |
-          cd ${{github.workspace}}/.build/
+          cd ${{github.workspace}}/.build-x86_64/
           tar -czvf opencl-language-server-linux-x86_64.tar.gz opencl-language-server
+          
+          cd ${{github.workspace}}/.build-armv8/
+          tar -czvf opencl-language-server-linux-arm64.tar.gz opencl-language-server
 
-      - name: Linux - Upload Artifact
+      - name: Linux - Upload Artifact (x86_64)
         if: "contains(matrix.config.os, 'ubuntu')"
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{github.token}}
         with:
           upload_url: ${{needs.create_release.outputs.upload_url}}
-          asset_path: ${{github.workspace}}/.build/opencl-language-server-linux-x86_64.tar.gz
+          asset_path: ${{github.workspace}}/.build-x86_64/opencl-language-server-linux-x86_64.tar.gz
           asset_name: opencl-language-server-linux-x86_64.tar.gz
+          asset_content_type: application/gzip
+      
+      - name: Linux - Upload Artifact (armv8)
+        if: "contains(matrix.config.os, 'ubuntu')"
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{github.token}}
+        with:
+          upload_url: ${{needs.create_release.outputs.upload_url}}
+          asset_path: ${{github.workspace}}/.build-armv8/opencl-language-server-linux-arm64.tar.gz
+          asset_name: opencl-language-server-linux-arm64.tar.gz
           asset_content_type: application/gzip
 
 
@@ -139,14 +160,17 @@ jobs:
           ./build.py conan-install -o .conan-x86_64 -pr:h profiles/darwin.release.x86_64
           ./build.py configure -t .conan-x86_64/build/Release/generators/conan_toolchain.cmake -b .build-x86_64 -bt Release
           ./build.py build -b .build-x86_64
+          file .build-x86_64/opencl-language-server
 
           ./build.py conan-install -o .conan-armv8 -pr:h profiles/darwin.release.armv8
           ./build.py configure -t .conan-armv8/build/Release/generators/conan_toolchain.cmake -b .build-armv8 -bt Release
           ./build.py build -b .build-armv8
+          file .build-armv8/opencl-language-server
 
           mkdir -p .build-universal/
           lipo -create -output .build-universal/opencl-language-server .build-x86_64/opencl-language-server .build-armv8/opencl-language-server
           lipo -archs .build-universal/opencl-language-server 
+          file .build-universal/opencl-language-server
 
       - name: Mac - Archive Artifact
         if: "contains(matrix.config.os, 'macos')"
@@ -196,7 +220,7 @@ jobs:
       - name: Linux - Archive Licenses
         if: "contains(matrix.config.os, 'ubuntu')"
         run: | 
-          cd ${{github.workspace}}/.conan-install
+          cd ${{github.workspace}}/.conan-x86_64
           tar -czvf licenses.tar.gz licenses
 
       - name: Linux - Upload Licenses
@@ -206,6 +230,6 @@ jobs:
           GITHUB_TOKEN: ${{github.token}}
         with:
           upload_url: ${{needs.create_release.outputs.upload_url}}
-          asset_path: ${{github.workspace}}/.conan-install/licenses.tar.gz
+          asset_path: ${{github.workspace}}/.conan-x86_64/licenses.tar.gz
           asset_name: licenses.tar.gz
           asset_content_type: application/gzip

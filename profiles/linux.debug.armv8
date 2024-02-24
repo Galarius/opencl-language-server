@@ -1,0 +1,6 @@
+include(linux.common)
+include(linux.common.armv8)
+
+[settings]
+arch=armv8
+build_type=Debug
