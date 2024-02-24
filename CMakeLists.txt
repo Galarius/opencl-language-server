@@ -64,6 +64,7 @@ endif()
 
 set(headers
     clinfo.hpp
+    completion.hpp
     device.hpp
     diagnostics.hpp
     jsonrpc.hpp
@@ -73,6 +74,7 @@ set(headers
 )
 set(sources
     clinfo.cpp
+    completion.cpp
     diagnostics.cpp
     jsonrpc.cpp
     log.cpp

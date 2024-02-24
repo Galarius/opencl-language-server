@@ -5,6 +5,7 @@
 //  Created by Ilia Shoshin on 7/16/21.
 //
 
+#include "completion.hpp"
 #include "diagnostics.hpp"
 #include "jsonrpc.hpp"
 #include "log.hpp"
@@ -64,18 +65,6 @@ public:
     void Interrupt();
 
 private:
-    void BuildDiagnosticsRespond(const std::string &uri, const std::string &content);
-    void GetConfiguration();
-    void OnInitialize(const json &data);
-    void OnInitialized(const json &data);
-    void OnTextOpen(const json &data);
-    void OnTextChanged(const json &data);
-    void OnConfiguration(const json &data);
-    void OnRespond(const json &data);
-    void OnShutdown(const json &data);
-    void OnExit();
-
-private:
     std::shared_ptr<IJsonRPC> m_jrpc;
     std::shared_ptr<ILSPServerEventsHandler> m_handler;
     std::atomic<bool> m_interrupted = {false};
@@ -87,21 +76,26 @@ public:
     LSPServerEventsHandler(
         std::shared_ptr<IJsonRPC> jrpc,
         std::shared_ptr<IDiagnostics> diagnostics,
+        std::shared_ptr<ICompletion> completion,
         std::shared_ptr<utils::IGenerator> generator,
         std::shared_ptr<utils::IExitHandler> exitHandler)
         : m_jrpc {std::move(jrpc)}
         , m_diagnostics {std::move(diagnostics)}
+        , m_completion {std::move(completion)}
         , m_generator {std::move(generator)}
         , m_exitHandler {std::move(exitHandler)}
     {}
 
     void BuildDiagnosticsRespond(const std::string &uri, const std::string &content);
+    void BuildCompletionRespond(const json &data);
     void GetConfiguration();
     std::optional<json> GetNextResponse();
     void OnInitialize(const json &data);
     void OnInitialized(const json &data);
     void OnTextOpen(const json &data);
     void OnTextChanged(const json &data);
+    void OnCompletion(const json &data);
+    void OnResolveCompletion(const json &data);
     void OnConfiguration(const json &data);
     void OnRespond(const json &data);
     void OnShutdown(const json &data);
@@ -110,6 +104,7 @@ public:
 private:
     std::shared_ptr<IJsonRPC> m_jrpc;
     std::shared_ptr<IDiagnostics> m_diagnostics;
+    std::shared_ptr<ICompletion> m_completion;
     std::shared_ptr<utils::IGenerator> m_generator;
     std::shared_ptr<utils::IExitHandler> m_exitHandler;
     std::queue<json> m_outQueue;
@@ -204,6 +199,11 @@ void LSPServerEventsHandler::OnInitialize(const json &data)
              {"willSaveWaitUntil", false},
              {"save", false},
          }},
+         {
+            "completionProvider", {
+                {"resolveProvider", true},
+            }
+         }
     };
 
     m_outQueue.push({{"id", requestId}, {"result", {{"capabilities", capabilities}}}});
@@ -254,6 +254,36 @@ void LSPServerEventsHandler::BuildDiagnosticsRespond(const std::string &uri, con
     }
 }
 
+void LSPServerEventsHandler::BuildCompletionRespond(const json &data)
+{
+    try
+    {
+        auto uri = GetNestedValue(data, {"params", "textDocument", "uri"});
+        auto triggerKind = GetNestedValue(data, {"params", "context", "triggerKind"});
+        auto character = GetNestedValue(data, {"params", "position", "character"});
+        auto line = GetNestedValue(data, {"params", "position", "line"});
+        nlohmann::json completionItems = nlohmann::json::array();
+        if(uri && character && line) {
+            const auto filePath = utils::UriToFilePath(*uri);
+            auto completions = m_completion->GetCompletions(filePath, static_cast<unsigned>(*line) + 1, *character);
+            for(auto & item : completions) {
+                completionItems.emplace_back(nlohmann::json {
+                    {"label", item.label},
+                    {"detail", item.detail},
+                    {"kind", static_cast<unsigned>(item.itemKind)}
+                });
+            }
+        }
+        m_outQueue.push({{"id", data["id"]}, {"result", completionItems}});
+    }
+    catch (std::exception &err)
+    {
+        auto msg = std::string("Failed to get completion: ") + err.what();
+        logger()->error(msg);
+        m_jrpc->WriteError(JRPCErrorCode::InternalError, msg);
+    }
+}
+
 void LSPServerEventsHandler::OnTextOpen(const json &data)
 {
     logger()->trace("Received 'textOpen' message");
@@ -280,6 +310,46 @@ void LSPServerEventsHandler::OnTextChanged(const json &data)
             auto text = lastContent["text"].get<std::string>();
             BuildDiagnosticsRespond(uri->get<std::string>(), text);
         }
+    }
+}
+
+//{
+//    "id": 1,
+//    "jsonrpc": "2.0",
+//    "method": "textDocument/completion",
+//    "params": {
+//        "context": {
+//            "triggerKind": 1
+//        },
+//        "position": {
+//            "character": 27,
+//            "line": 12
+//        },
+//        "textDocument": {
+//            "uri": "file:///Users/is/Dev/pm-ocl/kernel/kernel.cl"
+//        }
+//    }
+//}
+void LSPServerEventsHandler::OnCompletion(const json &data)
+{
+    logger()->trace("Received 'completion' message");
+    BuildCompletionRespond(data);
+}
+
+// {\"id\":2,\"jsonrpc\":\"2.0\",\"method\":\"completionItem/resolve\",\"params\":{\"detail\":\"FunctionDecl\",\"insertTextFormat\":1,\"kind\":2,\"label\":\"getChannel\"}}
+void LSPServerEventsHandler::OnResolveCompletion(const json &data)
+{
+    logger()->trace("Received 'completionItem/resolve' message");
+    try
+    {
+        auto label = GetNestedValue(data, {"params", "label"});
+        m_outQueue.push({{"id", data["id"]}, {"result", data["params"]}});
+    }
+    catch (std::exception &err)
+    {
+        auto msg = std::string("Failed to resolve completion: ") + err.what();
+        logger()->error(msg);
+        m_jrpc->WriteError(JRPCErrorCode::InternalError, msg);
     }
 }
 
@@ -406,6 +476,14 @@ int LSPServer::Run()
     {
         self->m_handler->OnTextChanged(request);
     });
+    m_jrpc->RegisterMethodCallback("textDocument/completion", [self](const json &request)
+    {
+        self->m_handler->OnCompletion(request);
+    });
+    m_jrpc->RegisterMethodCallback("completionItem/resolve", [self](const json &request)
+    {
+        self->m_handler->OnResolveCompletion(request);
+    });
     m_jrpc->RegisterMethodCallback("workspace/didChangeConfiguration", [self](const json &)
     {
         self->m_handler->GetConfiguration();
@@ -461,10 +539,11 @@ void LSPServer::Interrupt()
 std::shared_ptr<ILSPServerEventsHandler> CreateLSPEventsHandler(
     std::shared_ptr<IJsonRPC> jrpc,
     std::shared_ptr<IDiagnostics> diagnostics,
+    std::shared_ptr<ICompletion> completion,
     std::shared_ptr<utils::IGenerator> generator,
     std::shared_ptr<utils::IExitHandler> exitHandler)
 {
-    return std::make_shared<LSPServerEventsHandler>(jrpc, diagnostics, generator, exitHandler);
+    return std::make_shared<LSPServerEventsHandler>(jrpc, diagnostics, completion, generator, exitHandler);
 }
 
 std::shared_ptr<ILSPServer> CreateLSPServer(
@@ -473,11 +552,11 @@ std::shared_ptr<ILSPServer> CreateLSPServer(
     return std::make_shared<LSPServer>(std::move(jrpc), std::move(handler));
 }
 
-std::shared_ptr<ILSPServer> CreateLSPServer(std::shared_ptr<IJsonRPC> jrpc, std::shared_ptr<IDiagnostics> diagnostics)
+std::shared_ptr<ILSPServer> CreateLSPServer(std::shared_ptr<IJsonRPC> jrpc, std::shared_ptr<IDiagnostics> diagnostics, std::shared_ptr<ICompletion> completion)
 {
     auto generator = utils::CreateDefaultGenerator();
     auto exitHandler = utils::CreateDefaultExitHandler();
-    auto handler = std::make_shared<LSPServerEventsHandler>(jrpc, diagnostics, generator, exitHandler);
+    auto handler = std::make_shared<LSPServerEventsHandler>(jrpc, diagnostics, completion, generator, exitHandler);
     return std::make_shared<LSPServer>(std::move(jrpc), std::move(handler));
 }
 

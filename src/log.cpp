@@ -19,6 +19,7 @@ namespace ocls {
 std::string LogName::main = "opencl-ls";
 std::string LogName::clinfo = "clinfo";
 std::string LogName::diagnostics = "diagnostics";
+std::string LogName::completion = "completion";
 std::string LogName::jrpc = "jrpc";
 std::string LogName::lsp = "lsp";
 
@@ -41,6 +42,7 @@ void ConfigureLogging(bool fileLogging, const std::string& filename, spdlog::lev
         std::vector<std::shared_ptr<spdlog::logger>> subLoggers = {
             std::make_shared<spdlog::logger>(LogName::clinfo, sink),
             std::make_shared<spdlog::logger>(LogName::diagnostics, sink),
+            std::make_shared<spdlog::logger>(LogName::completion, sink),
             std::make_shared<spdlog::logger>(LogName::jrpc, sink),
             std::make_shared<spdlog::logger>(LogName::lsp, sink)};
 

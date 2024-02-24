@@ -134,6 +134,57 @@ private:
     bool json = false;
 };
 
+struct CompletionSubCommand final : public SubCommand
+{
+    CompletionSubCommand(CLI::App& app) : SubCommand(app, "completion", "Provides an OpenCL kernel completions")
+    {
+        cmd->add_flag("-j,--json", json, "Print diagnostics in JSON format");
+        cmd->add_option("-k,--kernel", kernel, "Path to a kernel file")->required(true);
+        cmd->add_option(
+               "-l,--line",
+               line,
+               "line number")
+            ->capture_default_str();
+        cmd->add_option(
+               "-c,--column",
+               column,
+               "column number")
+            ->capture_default_str();
+    }
+
+    int Execute(const std::shared_ptr<ICompletion>& completion)
+    {
+        try
+        {
+            if (json)
+            {
+
+            }
+            else
+            {
+                auto completions = completion->GetCompletions(kernel, line, column);
+                for(auto &completion : completions) {
+                    std::cout << completion.label << ", ";
+                }
+                std::cout << std::endl;
+            }
+        }
+        catch (std::exception& err)
+        {
+            std::cerr << "Failed to get v: " << err.what() << std::endl;
+            return EXIT_FAILURE;
+        }
+
+        return EXIT_SUCCESS;
+    }
+
+private:
+    std::string kernel;
+    uint32_t line = 0;
+    uint32_t column = 0;
+    bool json = false;
+};
+
 std::shared_ptr<ILSPServer> server;
 
 static void SignalHandler(int)
@@ -196,6 +247,7 @@ int main(int argc, char* argv[])
 
     CLInfoSubCommand clInfoCmd(app);
     DiagnosticsSubCommand diagnosticsCmd(app);
+    CompletionSubCommand completionCmd(app);
     CLI11_PARSE(app, argc, argv);
     if(flagLogTofile)
     {
@@ -218,10 +270,18 @@ int main(int argc, char* argv[])
         return diagnosticsCmd.Execute(diagnostics);
     }
 
+    // ToDo: search default system locations or customize
+    std::vector<std::string> args = {"-I/usr/local/Cellar/llvm/16.0.6/lib/clang/16/include", "-include", "opencl-c.h"};
+    auto completion = CreateCompletion(args);
+    if (completionCmd.IsParsed())
+    {
+        return completionCmd.Execute(completion);
+    }
+
     SetupBinaryStreamMode();
     std::signal(SIGINT, SignalHandler);
 
     auto jrpc = CreateJsonRPC();
-    server = CreateLSPServer(jrpc, diagnostics);
+    server = CreateLSPServer(jrpc, diagnostics, completion);
     return server->Run();
 }

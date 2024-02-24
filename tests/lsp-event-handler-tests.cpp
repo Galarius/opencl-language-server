@@ -10,6 +10,7 @@
 #include "exit-handler-mock.hpp"
 #include "jsonrpc-mock.hpp"
 #include "diagnostics-mock.hpp"
+#include "completion-mock.hpp"
 #include "generator-mock.hpp"
 
 #include <gtest/gtest.h>
@@ -26,6 +27,7 @@ class LSPTest : public ::testing::Test
 protected:
     std::shared_ptr<JsonRPCMock> mockJsonRPC;
     std::shared_ptr<DiagnosticsMock> mockDiagnostics;
+    std::shared_ptr<CompletionMock> mockCompletion;
     std::shared_ptr<GeneratorMock> mockGenerator;
     std::shared_ptr<ExitHandlerMock> mockExitHandler;
     std::shared_ptr<ILSPServerEventsHandler> handler;
@@ -34,12 +36,13 @@ protected:
     {
         mockJsonRPC = std::make_shared<JsonRPCMock>();
         mockDiagnostics = std::make_shared<DiagnosticsMock>();
+        mockCompletion = std::make_shared<CompletionMock>();
         mockGenerator = std::make_shared<GeneratorMock>();
         mockExitHandler = std::make_shared<ExitHandlerMock>();
 
         ON_CALL(*mockGenerator, GenerateID()).WillByDefault(::testing::Return("12345678"));
 
-        handler = CreateLSPEventsHandler(mockJsonRPC, mockDiagnostics, mockGenerator, mockExitHandler);
+        handler = CreateLSPEventsHandler(mockJsonRPC, mockDiagnostics, mockCompletion, mockGenerator, mockExitHandler);
     }
 
     std::tuple<std::string, std::string> GetTestSource() const
