@@ -7,6 +7,7 @@ if(DEFINED LLVM_ROOT_DIR AND NOT LLVM_ROOT_DIR STREQUAL "")
   # LLVM_ROOT_DIR is already defined
 else()
   # Download prebuilt static llvm & clang libraries
+  # TODO: prebuilt libs for Linux ARM are missing
   file(STRINGS ${CMAKE_CURRENT_SOURCE_DIR}/libclang-urls.txt libclang_entries)
   message(STATUS "Parsing ${CMAKE_CURRENT_SOURCE_DIR}/libclang-urls.txt...")
   foreach(entry ${libclang_entries})

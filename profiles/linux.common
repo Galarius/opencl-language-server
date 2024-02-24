@@ -2,7 +2,7 @@
 
 [settings]
 compiler=gcc
-compiler.version=11
+compiler.version=9
 compiler.libcxx=libstdc++11
 compiler.cppstd = gnu17
 os=Linux
