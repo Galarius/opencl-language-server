@@ -72,15 +72,15 @@ jobs:
           conan profile detect
 
       # The following step is copied from the build.yml.
-      # TODO: reuse it
-      - name: Cache libclang
-        id: cache-libclang
-        uses: actions/cache@v3
-        env:
-          cache-name: cache-libclang
-        with:
-          path: .build/_deps/libclang-subbuild/libclang-populate-prefix/src/*.7z
-          key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('libclang/libclang-urls.txt') }}
+      # TODO: reuse if when needed (#17, #24)
+      # - name: Cache libclang
+      #   id: cache-libclang
+      #   uses: actions/cache@v3
+      #   env:
+      #     cache-name: cache-libclang
+      #   with:
+      #     path: .build/_deps/libclang-subbuild/libclang-populate-prefix/src/*.7z
+      #     key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('libclang/libclang-urls.txt') }}
 
 
       - name: Windows - Configure & Build (Release)
