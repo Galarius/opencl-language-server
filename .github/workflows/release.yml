@@ -9,23 +9,20 @@ env:
 
 jobs:
   create_release:
-      name: Create Release
-      runs-on: ubuntu-latest
-      permissions:
-        contents: write
-      outputs:
-        upload_url: ${{steps.create_release.outputs.upload_url}}
-      steps:
-        - name: Create release
-          id: create_release
-          uses: actions/create-release@v1
-          env:
-            GITHUB_TOKEN: ${{github.token}}
-          with:
-            tag_name: ${{github.ref}}
-            release_name: Release ${{github.ref}}
-            draft: true 
-            prerelease: false
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      upload_url: ${{steps.create_release.outputs.upload_url}}
+    steps:
+      - name: Create release
+        id: create_release
+        uses: ncipollo/release-action@v1
+        with:
+          name: Release ${{github.ref}}
+          tag: ${{github.ref}}
+          draft: true 
+          prerelease: false
 
   build_release:
     name: Build Release
