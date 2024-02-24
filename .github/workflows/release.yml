@@ -27,6 +27,8 @@ jobs:
   build_release:
     name: Build Release
     runs-on: ${{ matrix.config.os }}
+    permissions:
+      contents: write
     needs: create_release
     strategy:
       matrix:
@@ -40,7 +42,7 @@ jobs:
       CONAN_HOME: ${{ github.workspace }}/.conan-home
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
       - name: Linux - Install prerequisites
         if: "contains(matrix.config.os, 'ubuntu')"
@@ -215,14 +217,15 @@ jobs:
           asset_path: ${{github.workspace}}/.build-universal/opencl-language-server-darwin-universal.tar.gz
           asset_name: opencl-language-server-darwin-universal.tar.gz
           asset_content_type: application/gzip
-      
-      - name: Linux - Archive Licenses
+
+
+      - name: Archive Licenses
         if: "contains(matrix.config.os, 'ubuntu')"
         run: | 
           cd ${{github.workspace}}/.conan-x86_64
           tar -czvf licenses.tar.gz licenses
 
-      - name: Linux - Upload Licenses
+      - name: Upload Licenses
         if: "contains(matrix.config.os, 'ubuntu')"
         uses: actions/upload-release-asset@v1
         env:
