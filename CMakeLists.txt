@@ -81,6 +81,11 @@ set(sources
     main.cpp
     utils.cpp
 )
+
+if(APPLE)
+    set(headers ${headers} oslogger.hpp)
+endif()
+
 list(TRANSFORM headers PREPEND "${CMAKE_CURRENT_SOURCE_DIR}/include/")
 list(TRANSFORM sources PREPEND "${CMAKE_CURRENT_SOURCE_DIR}/src/")
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/include/version.hpp.in version.hpp)
