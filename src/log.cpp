@@ -6,6 +6,7 @@
 //
 
 #include "log.hpp"
+#include "oslogger.hpp"
 #include "utils.hpp"
 
 #include <iostream>
@@ -26,23 +27,27 @@ void ConfigureLogging(bool fileLogging, const std::string& filename, spdlog::lev
 {
     try
     {
-        spdlog::sink_ptr sink;
+        std::vector<spdlog::sink_ptr> sinks;
         if (fileLogging)
         {
-            sink = std::make_shared<spdlog::sinks::basic_file_sink_st>(filename);
+            sinks.push_back(std::make_shared<spdlog::sinks::basic_file_sink_st>(filename));
         }
         else
         {
-            sink = std::make_shared<spdlog::sinks::null_sink_st>();
+            sinks.push_back(std::make_shared<spdlog::sinks::null_sink_st>());
         }
+#if defined(__APPLE__)
+        sinks.push_back(std::make_shared<ocls::oslogger_sink_mt>());
+#endif
 
-        spdlog::set_default_logger(std::make_shared<spdlog::logger>(LogName::main, sink));
+        spdlog::set_default_logger(std::make_shared<spdlog::logger>(LogName::main, sinks.begin(), sinks.end()));
         spdlog::set_level(level);
         std::vector<std::shared_ptr<spdlog::logger>> subLoggers = {
-            std::make_shared<spdlog::logger>(LogName::clinfo, sink),
-            std::make_shared<spdlog::logger>(LogName::diagnostics, sink),
-            std::make_shared<spdlog::logger>(LogName::jrpc, sink),
-            std::make_shared<spdlog::logger>(LogName::lsp, sink)};
+            std::make_shared<spdlog::logger>(LogName::clinfo, sinks.begin(), sinks.end()),
+            std::make_shared<spdlog::logger>(LogName::diagnostics, sinks.begin(), sinks.end()),
+            std::make_shared<spdlog::logger>(LogName::jrpc, sinks.begin(), sinks.end()),
+            std::make_shared<spdlog::logger>(LogName::lsp, sinks.begin(), sinks.end())
+        };
 
         for (const auto& logger : subLoggers)
         {
