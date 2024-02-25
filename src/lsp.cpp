@@ -15,6 +15,9 @@
 #include <atomic>
 #include <iostream>
 #include <queue>
+#include <future>
+#include <unordered_map>
+#include <mutex>
 
 using namespace nlohmann;
 
@@ -43,12 +46,42 @@ std::optional<nlohmann::json> GetNestedValue(const nlohmann::json &j, const std:
 
 namespace ocls {
 
-auto logger() { return spdlog::get(ocls::LogName::lsp); }
+auto logger()
+{
+    return spdlog::get(ocls::LogName::lsp);
+}
 
 struct Capabilities
 {
     bool hasConfigurationCapability = false;
     bool supportDidChangeConfiguration = false;
+};
+
+// Thread-safe queue for JSON messages
+class JsonQueue final
+{
+public:
+    void push(json data)
+    {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        m_queue.push(data);
+    }
+
+    std::optional<json> pop()
+    {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        if (m_queue.empty())
+        {
+            return std::nullopt;
+        }
+        auto data = m_queue.front();
+        m_queue.pop();
+        return data;
+    }
+
+private:
+    std::queue<json> m_queue;
+    std::mutex m_mutex;
 };
 
 class LSPServer final
@@ -87,7 +120,7 @@ public:
     {}
 
     void BuildDiagnosticsRespond(const std::string &uri, const std::string &content);
-    void BuildCompletionRespond(const json &data);
+    json BuildCompletionRespond(const json &data);
     void GetConfiguration();
     std::optional<json> GetNextResponse();
     void OnInitialize(const json &data);
@@ -97,6 +130,7 @@ public:
     void OnCompletion(const json &data);
     void OnResolveCompletion(const json &data);
     void OnConfiguration(const json &data);
+    void OnCancel(const nlohmann::json &data);
     void OnRespond(const json &data);
     void OnShutdown(const json &data);
     void OnExit();
@@ -107,9 +141,11 @@ private:
     std::shared_ptr<ICompletion> m_completion;
     std::shared_ptr<utils::IGenerator> m_generator;
     std::shared_ptr<utils::IExitHandler> m_exitHandler;
-    std::queue<json> m_outQueue;
+    JsonQueue m_outQueue;
     Capabilities m_capabilities;
     std::queue<std::pair<std::string, std::string>> m_requests;
+    std::unordered_map<std::string, std::promise<void>> m_taskMap;
+    std::mutex m_taskMapMutex;
     bool m_shutdown = false;
 };
 
@@ -137,14 +173,7 @@ void LSPServerEventsHandler::GetConfiguration()
 
 std::optional<json> LSPServerEventsHandler::GetNextResponse()
 {
-    if (m_outQueue.empty())
-    {
-        return std::nullopt;
-    }
-
-    auto data = m_outQueue.front();
-    m_outQueue.pop();
-    return data;
+    return m_outQueue.pop();
 }
 
 void LSPServerEventsHandler::OnInitialize(const json &data)
@@ -199,12 +228,10 @@ void LSPServerEventsHandler::OnInitialize(const json &data)
              {"willSaveWaitUntil", false},
              {"save", false},
          }},
+        {"completionProvider",
          {
-            "completionProvider", {
-                {"resolveProvider", true},
-            }
-         }
-    };
+             {"resolveProvider", true},
+         }}};
 
     m_outQueue.push({{"id", requestId}, {"result", {{"capabilities", capabilities}}}});
 }
@@ -254,34 +281,24 @@ void LSPServerEventsHandler::BuildDiagnosticsRespond(const std::string &uri, con
     }
 }
 
-void LSPServerEventsHandler::BuildCompletionRespond(const json &data)
+json LSPServerEventsHandler::BuildCompletionRespond(const json &data)
 {
-    try
+    auto uri = GetNestedValue(data, {"params", "textDocument", "uri"});
+    auto triggerKind = GetNestedValue(data, {"params", "context", "triggerKind"});
+    auto character = GetNestedValue(data, {"params", "position", "character"});
+    auto line = GetNestedValue(data, {"params", "position", "line"});
+    nlohmann::json completionItems = nlohmann::json::array();
+    if (uri && character && line)
     {
-        auto uri = GetNestedValue(data, {"params", "textDocument", "uri"});
-        auto triggerKind = GetNestedValue(data, {"params", "context", "triggerKind"});
-        auto character = GetNestedValue(data, {"params", "position", "character"});
-        auto line = GetNestedValue(data, {"params", "position", "line"});
-        nlohmann::json completionItems = nlohmann::json::array();
-        if(uri && character && line) {
-            const auto filePath = utils::UriToFilePath(*uri);
-            auto completions = m_completion->GetCompletions(filePath, static_cast<unsigned>(*line) + 1, *character);
-            for(auto & item : completions) {
-                completionItems.emplace_back(nlohmann::json {
-                    {"label", item.label},
-                    {"detail", item.detail},
-                    {"kind", static_cast<unsigned>(item.itemKind)}
-                });
-            }
+        const auto filePath = utils::UriToFilePath(*uri);
+        auto completions = m_completion->GetCompletions(filePath, static_cast<unsigned>(*line) + 1, *character);
+        for (auto &item : completions)
+        {
+            completionItems.emplace_back(nlohmann::json {
+                {"label", item.label}, {"detail", item.detail}, {"kind", static_cast<unsigned>(item.itemKind)}});
         }
-        m_outQueue.push({{"id", data["id"]}, {"result", completionItems}});
     }
-    catch (std::exception &err)
-    {
-        auto msg = std::string("Failed to get completion: ") + err.what();
-        logger()->error(msg);
-        m_jrpc->WriteError(JRPCErrorCode::InternalError, msg);
-    }
+    return {{"id", data["id"]}, {"result", completionItems}};
 }
 
 void LSPServerEventsHandler::OnTextOpen(const json &data)
@@ -333,7 +350,38 @@ void LSPServerEventsHandler::OnTextChanged(const json &data)
 void LSPServerEventsHandler::OnCompletion(const json &data)
 {
     logger()->trace("Received 'completion' message");
-    BuildCompletionRespond(data);
+
+    auto requestId = std::to_string(data["id"].get<int>());
+    std::promise<void> cancelPromise;
+    auto cancelFuture = cancelPromise.get_future();
+    {
+        std::lock_guard<std::mutex> guard(m_taskMapMutex);
+        m_taskMap[requestId] = std::move(cancelPromise);
+    }
+    // Run the task asynchronously
+    std::thread([this, cancelFuture = std::move(cancelFuture), data]() mutable {
+        auto requestId = std::to_string(data["id"].get<int>());
+        logger()->trace("Start a new 'completion' job '{}'", requestId);
+        try
+        {
+            // TODO:
+            // Check cancellation status periodically
+            //        if(cancelFuture.wait_for(std::chrono::milliseconds(0)) == std::future_status::timeout) {
+            //        }
+            m_outQueue.push(this->BuildCompletionRespond(data));
+        }
+        catch (std::exception &err)
+        {
+            auto msg = std::string("Failed to get completion: ") + err.what();
+            logger()->error(msg);
+            // TODO:
+            // m_jrpc->WriteError(JRPCErrorCode::InternalError, msg);
+        }
+        {
+            std::lock_guard<std::mutex> guard(m_taskMapMutex);
+            m_taskMap.erase(requestId);
+        }
+    }).detach(); // Detaching for simplicity; consider managing threads more carefully
 }
 
 // {\"id\":2,\"jsonrpc\":\"2.0\",\"method\":\"completionItem/resolve\",\"params\":{\"detail\":\"FunctionDecl\",\"insertTextFormat\":1,\"kind\":2,\"label\":\"getChannel\"}}
@@ -387,6 +435,34 @@ void LSPServerEventsHandler::OnConfiguration(const json &data)
         {
             auto deviceID = result[DeviceID].get<int64_t>();
             m_diagnostics->SetOpenCLDevice(static_cast<uint32_t>(deviceID));
+        }
+    }
+    catch (std::exception &err)
+    {
+        logger()->error("Failed to update settings, {}", err.what());
+    }
+}
+
+// {"jsonrpc":"2.0","method":"$/cancelRequest","params":{"id":1}}
+void LSPServerEventsHandler::OnCancel(const nlohmann::json &data)
+{
+    logger()->trace("Received 'cancel' method");
+    try
+    {
+        std::lock_guard<std::mutex> guard(m_taskMapMutex);
+        auto requestId = std::to_string(GetNestedValue(data, {"params", "id"})->get<int>());
+        logger()->trace("Will cancel job '{}'", requestId);
+        auto it = m_taskMap.find(requestId);
+        if (it != m_taskMap.end())
+        {
+            // Signal the task to cancel by setting the promise
+            it->second.set_value();
+            m_taskMap.erase(it); // Remove the promise from the map
+            logger()->trace("Job '{}' has been cancelled", requestId);
+        }
+        else
+        {
+            logger()->trace("Job '{}' does not exist", requestId);
         }
     }
     catch (std::exception &err)
@@ -488,6 +564,10 @@ int LSPServer::Run()
     {
         self->m_handler->GetConfiguration();
     });
+    m_jrpc->RegisterMethodCallback("$/cancelRequest", [self](const json &request)
+    {
+        self->m_handler->OnCancel(request);
+    });
     // Register handler for client responds
     m_jrpc->RegisterInputCallback([self](const json &respond)
     {
@@ -552,7 +632,8 @@ std::shared_ptr<ILSPServer> CreateLSPServer(
     return std::make_shared<LSPServer>(std::move(jrpc), std::move(handler));
 }
 
-std::shared_ptr<ILSPServer> CreateLSPServer(std::shared_ptr<IJsonRPC> jrpc, std::shared_ptr<IDiagnostics> diagnostics, std::shared_ptr<ICompletion> completion)
+std::shared_ptr<ILSPServer> CreateLSPServer(
+    std::shared_ptr<IJsonRPC> jrpc, std::shared_ptr<IDiagnostics> diagnostics, std::shared_ptr<ICompletion> completion)
 {
     auto generator = utils::CreateDefaultGenerator();
     auto exitHandler = utils::CreateDefaultExitHandler();

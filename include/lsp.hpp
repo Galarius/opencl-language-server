@@ -39,6 +39,7 @@ struct ILSPServerEventsHandler
     virtual void OnCompletion(const nlohmann::json &data) = 0;
     virtual void OnResolveCompletion(const nlohmann::json &data) = 0;
     virtual void OnConfiguration(const nlohmann::json &data) = 0;
+    virtual void OnCancel(const nlohmann::json &data) = 0;
     virtual void OnRespond(const nlohmann::json &data) = 0;
     virtual void OnShutdown(const nlohmann::json &data) = 0;
     virtual void OnExit() = 0;
@@ -54,6 +55,7 @@ std::shared_ptr<ILSPServerEventsHandler> CreateLSPEventsHandler(
 std::shared_ptr<ILSPServer> CreateLSPServer(
     std::shared_ptr<IJsonRPC> jrpc, std::shared_ptr<ILSPServerEventsHandler> handler);
 
-std::shared_ptr<ILSPServer> CreateLSPServer(std::shared_ptr<IJsonRPC> jrpc, std::shared_ptr<IDiagnostics> diagnostics, std::shared_ptr<ICompletion> completion);
+std::shared_ptr<ILSPServer> CreateLSPServer(
+    std::shared_ptr<IJsonRPC> jrpc, std::shared_ptr<IDiagnostics> diagnostics, std::shared_ptr<ICompletion> completion);
 
 } // namespace ocls
