@@ -28,6 +28,11 @@ using namespace ocls;
 
 namespace {
 
+auto logger()
+{
+    return spdlog::get(ocls::LogName::main);
+}
+
 struct SubCommand
 {
     SubCommand(CLI::App& app, std::string name, std::string description) : cmd {app.add_subcommand(name, description)}
@@ -54,8 +59,10 @@ struct CLInfoSubCommand final : public SubCommand
     int Execute(const std::shared_ptr<ICLInfo>& clinfo)
     {
         const auto jsonBody = clinfo->json();
-        const int indentation = prettyPrint ? 4 : -1;
-        std::cout << jsonBody.dump(indentation) << std::endl;
+        const auto indentation = prettyPrint ? 4 : -1;
+        const auto info = jsonBody.dump(indentation);
+        logger()->trace("Result: {}", info);
+        std::cout << info << std::endl;
         return EXIT_SUCCESS;
     }
 

@@ -226,9 +226,11 @@ json GetKernels(const std::string& strKernels)
 
 json::object_t GetDeviceJSONInfo(const cl::Device& device)
 {
+    logger()->trace("Getting device info...");
     json info;
     for (auto& property : deviceProperties)
     {
+        logger()->trace("Getting device property '{}' ...", property.name);
         try
         {
             switch (property.type)
@@ -354,7 +356,7 @@ json::object_t GetDeviceJSONInfo(const cl::Device& device)
         }
         catch (const cl::Error& err)
         {
-            logger()->error("Failed to get info for the device, {}", err.what());
+            logger()->error("Failed to get info for the property '{}', {}", property.name, err.what());
         }
     }
     return info;
@@ -362,6 +364,7 @@ json::object_t GetDeviceJSONInfo(const cl::Device& device)
 
 uint32_t CalculateDeviceID(const cl::Device& device)
 {
+    logger()->trace("Calculating device ID...");
     try
     {
         auto name = device.getInfo<CL_DEVICE_NAME>();
@@ -381,20 +384,9 @@ uint32_t CalculateDeviceID(const cl::Device& device)
     return 0;
 }
 
-json GetDevicesJSONInfo(const std::vector<cl::Device>& devices)
-{
-    json jsonDevices;
-    for (auto& device : devices)
-    {
-        auto info = GetDeviceJSONInfo(device);
-        info["DEVICE_ID"] = CalculateDeviceID(device);
-        jsonDevices.push_back(info);
-    }
-    return jsonDevices;
-}
-
 uint32_t CalculatePlatformID(const cl::Platform& platform)
 {
+    logger()->trace("Calculating platform ID...");
     try
     {
         const auto name = platform.getInfo<CL_PLATFORM_NAME>();
@@ -411,50 +403,13 @@ uint32_t CalculatePlatformID(const cl::Platform& platform)
     return 0;
 }
 
-json GetPlatformJSONInfo(const cl::Platform& platform)
-{
-    json info;
-    for (auto& property : platformProperties)
-    {
-        try
-        {
-            std::string value;
-            platform.getInfo(property.field, &value);
-            info[property.name] = value;
-        }
-        catch (const cl::Error& err)
-        {
-            logger()->error("Failed to get information for the platform, {}", err.what());
-        }
-    }
-
-    info["PLATFORM_ID"] = CalculatePlatformID(platform);
-
-    auto extensions = platform.getInfo<CL_PLATFORM_EXTENSIONS>();
-    info["CL_PLATFORM_EXTENSIONS"] = GetExtensions(extensions);
-
-    try
-    {
-        std::vector<cl::Device> devices;
-        platform.getDevices(CL_DEVICE_TYPE_ALL, &devices);
-        info["DEVICES"] = GetDevicesJSONInfo(devices);
-    }
-    catch (const cl::Error& err)
-    {
-        logger()->error("Failed to get platform's devices, {}", err.what());
-    }
-
-    return info;
-}
-
 std::vector<cl::Platform> GetPlatforms()
 {
-    logger()->trace("Searching for OpenCL platforms...");
+    logger()->trace("Getting platforms...");
     std::vector<cl::Platform> platforms;
     try
     {
         cl::Platform::get(&platforms);
-        logger()->trace("Found OpenCL platforms: {}", platforms.size());
     }
     catch (cl::Error& err)
     {
@@ -484,6 +439,7 @@ std::string GetPlatformDescription(const cl::Platform& platform)
 
 size_t GetDevicePowerIndex(const cl::Device& device)
 {
+    logger()->trace("Getting device power index...");
     try
     {
         const size_t maxComputeUnits = device.getInfo<CL_DEVICE_MAX_COMPUTE_UNITS>();
@@ -519,6 +475,61 @@ std::string GetDeviceDescription(const cl::Device& device)
     return "unknown";
 }
 
+json GetDevicesJSONInfo(const std::vector<cl::Device>& devices)
+{
+    logger()->trace("Getting devices info...");
+    if( devices.size() == 0 ) {
+        return json::array({});
+    }
+
+    json jsonDevices;
+    for (auto& device : devices)
+    {
+        const auto description = GetDeviceDescription(device);
+        logger()->debug("Device {}", description);
+        auto info = GetDeviceJSONInfo(device);
+        info["DEVICE_ID"] = CalculateDeviceID(device);
+        jsonDevices.push_back(info);
+    }
+    return jsonDevices;
+}
+
+json GetPlatformJSONInfo(const cl::Platform& platform)
+{
+    logger()->trace("Getting platform info...");
+    json info;
+    info["PLATFORM_ID"] = CalculatePlatformID(platform);
+    for (auto& property : platformProperties)
+    {
+        logger()->trace("Getting platform property '{}' ...", property.name);
+        try
+        {
+            std::string value;
+            platform.getInfo(property.field, &value);
+            info[property.name] = value;
+        }
+        catch (const cl::Error& err)
+        {
+            logger()->error("Failed to get information for the platform, {}", err.what());
+        }
+    }
+    auto extensions = platform.getInfo<CL_PLATFORM_EXTENSIONS>();
+    info["CL_PLATFORM_EXTENSIONS"] = GetExtensions(extensions);
+    try
+    {
+        std::vector<cl::Device> devices;
+        platform.getDevices(CL_DEVICE_TYPE_ALL, &devices);
+        logger()->debug("Found devices: {}", devices.size());
+        info["DEVICES"] = GetDevicesJSONInfo(devices);
+    }
+    catch (const cl::Error& err)
+    {
+        logger()->error("Failed to get platform's devices, {}", err.what());
+    }
+
+    return info;
+}
+
 // --- CLInfo ---
 
 class CLInfo final : public ICLInfo
@@ -528,13 +539,12 @@ public:
     {
         std::vector<nlohmann::json> jsonPlatforms;
         const auto platforms = GetPlatforms();
-        if (platforms.size() > 0)
+        logger()->debug("Found platforms: {}", platforms.size());
+        for (const auto& platform : platforms)
         {
-            for (const auto& platform : platforms)
-            {
-                logger()->trace("{}", GetPlatformDescription(platform));
-                jsonPlatforms.emplace_back(GetPlatformJSONInfo(platform));
-            }
+            const auto description = GetPlatformDescription(platform);
+            logger()->debug("Platform {}", description);
+            jsonPlatforms.emplace_back(GetPlatformJSONInfo(platform));
         }
         return nlohmann::json {{"PLATFORMS", jsonPlatforms}};
     }
@@ -546,7 +556,8 @@ public:
         const auto platforms = GetPlatforms();
         for (const auto& platform : platforms)
         {
-            logger()->trace("Platform {}", GetPlatformDescription(platform));
+            const auto description = GetPlatformDescription(platform);
+            logger()->trace("Platform {}", description);
             logger()->trace("Searching for platform's devices...");
 
             try
@@ -557,7 +568,7 @@ public:
                 if (logger()->level() <= spdlog::level::trace)
                 {
                     std::stringstream traceLog;
-                    traceLog << "Found OpenCL devices: " << platformDevices.size() << "\n";
+                    traceLog << "Found devices: " << platformDevices.size() << "\n";
                     for (const auto& device : platformDevices)
                     {
                         traceLog << "Device " << GetDeviceDescription(device) << "\n";
