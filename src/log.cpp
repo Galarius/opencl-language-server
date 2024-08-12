@@ -26,6 +26,8 @@ std::string LogName::diagnostics = "diagnostics";
 std::string LogName::jrpc = "jrpc";
 std::string LogName::lsp = "lsp";
 
+const int flushIntervalSec = 5;
+
 void ConfigureLogging(bool fileLogging, const std::string& filename, spdlog::level::level_enum level)
 {
     try
@@ -33,11 +35,11 @@ void ConfigureLogging(bool fileLogging, const std::string& filename, spdlog::lev
         std::vector<spdlog::sink_ptr> sinks;
         if (fileLogging)
         {
-            sinks.push_back(std::make_shared<spdlog::sinks::basic_file_sink_st>(filename));
+            sinks.push_back(std::make_shared<spdlog::sinks::basic_file_sink_mt>(filename));
         }
         else
         {
-            sinks.push_back(std::make_shared<spdlog::sinks::null_sink_st>());
+            sinks.push_back(std::make_shared<spdlog::sinks::null_sink_mt>());
         }
 #if defined(__APPLE__)
         sinks.push_back(std::make_shared<ocls::oslogger_sink_mt>());
@@ -57,8 +59,14 @@ void ConfigureLogging(bool fileLogging, const std::string& filename, spdlog::lev
             logger->set_level(level);
             spdlog::register_logger(logger);
         }
-        
-        spdlog::get(LogName::main)->info("\nStarting new session at {}...\n", utils::GetCurrentDateTime());
+
+        if (fileLogging)
+        {
+            spdlog::flush_on(level);
+            spdlog::flush_every(std::chrono::seconds(flushIntervalSec));
+        }
+
+        spdlog::get(LogName::main)->info("Starting new session at {}...\n", utils::GetCurrentDateTime());
     }
     catch (const spdlog::spdlog_ex& ex)
     {

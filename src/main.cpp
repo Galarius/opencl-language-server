@@ -207,21 +207,32 @@ int main(int argc, char* argv[])
     }
 
     auto clinfo = CreateCLInfo();
-    if (clInfoCmd.IsParsed())
-    {
-        return clInfoCmd.Execute(clinfo);
-    }
 
-    auto diagnostics = CreateDiagnostics(clinfo);
-    if (diagnosticsCmd.IsParsed())
-    {
-        return diagnosticsCmd.Execute(diagnostics);
-    }
+    int result = 0;
+    do {
+        if (clInfoCmd.IsParsed())
+        {
+            result = clInfoCmd.Execute(clinfo);
+            break;
+        }
 
-    SetupBinaryStreamMode();
-    std::signal(SIGINT, SignalHandler);
+        auto diagnostics = CreateDiagnostics(clinfo);
+        if (diagnosticsCmd.IsParsed())
+        {
+            result = diagnosticsCmd.Execute(diagnostics);
+            break;
+        }
 
-    auto jrpc = CreateJsonRPC();
-    server = CreateLSPServer(jrpc, diagnostics);
-    return server->Run();
+        SetupBinaryStreamMode();
+        std::signal(SIGINT, SignalHandler);
+
+        auto jrpc = CreateJsonRPC();
+        server = CreateLSPServer(jrpc, diagnostics);
+        result = server->Run();
+
+    } while (false);
+
+    spdlog::get(LogName::main)->info("Shutting down...\n\n");
+    spdlog::shutdown();
+    return result;
 }
