@@ -335,11 +335,29 @@ json::object_t GetDeviceJSONInfo(const cl::Device& device)
                     std::vector<cl_device_partition_property> values;
                     device.getInfo(property.field, &values);
                     json partitionProperties;
-                    for (auto value : values)
+                    for (size_t i = 0; i < values.size(); ++i)
                     {
-                        if (value != 0)
-                        {
-                            partitionProperties.emplace_back(devicePartitionPropertyChoices.at(value));
+                        auto value = values[i];
+                        switch(value) {
+                            case CL_DEVICE_PARTITION_EQUALLY:
+                            case CL_DEVICE_PARTITION_BY_AFFINITY_DOMAIN:
+                                partitionProperties.emplace_back(devicePartitionPropertyChoices.at(value));
+                                if(i + 1 < values.size()) {
+                                    partitionProperties.emplace_back(std::to_string(values[i++]));
+                                }
+                            break;
+                            case CL_DEVICE_PARTITION_BY_COUNTS:
+                                partitionProperties.emplace_back(devicePartitionPropertyChoices.at(value));
+                                while(i + 1 < values.size() && values[i + 1] != CL_DEVICE_PARTITION_BY_COUNTS_LIST_END) {
+                                    partitionProperties.emplace_back(std::to_string(values[i++]));
+                                }
+                            break;
+                            case 0:
+                                // The device cannot be partitioned (i.e. there is no partitioning scheme supported by the device that will return at least two sub-devices)
+                            break;
+                            default:
+                                logger()->warn("Unexpected value '{}' (property '{}')", value, property.name);
+                            break;
                         }
                     }
                     info[property.name] = partitionProperties;
@@ -357,6 +375,10 @@ json::object_t GetDeviceJSONInfo(const cl::Device& device)
         catch (const cl::Error& err)
         {
             logger()->error("Failed to get info for the property '{}', {}", property.name, err.what());
+        }
+        catch (const std::out_of_range &err) 
+        {
+            logger()->error("Unexpected value for the property '{}', {}", property.name, err.what());
         }
     }
     return info;
