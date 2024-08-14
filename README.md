@@ -10,6 +10,8 @@
 
 OpenCL Language Server requires OpenCL Runtime [[Intel](https://software.intel.com/en-us/articles/opencl-drivers), [NVidia](http://www.nvidia.com/Download/index.aspx), [AMD](http://support.amd.com/en-us/download)]
 
+* [Latest Microsoft Visual C++ Redistributable Version](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist?view=msvc-170) (Windows)
+
 ## Parameters
 
 You can configure diagnostics with `json-rpc` request during the intitialization:
