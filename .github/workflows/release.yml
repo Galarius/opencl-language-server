@@ -8,51 +8,38 @@ env:
   BUILD_TYPE: Release
 
 jobs:
-  create_release:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    outputs:
-      upload_url: ${{steps.create_release.outputs.upload_url}}
-    steps:
-      - name: Create release
-        id: create_release
-        uses: ncipollo/release-action@v1
-        with:
-          name: Release ${{github.ref}}
-          tag: ${{github.ref}}
-          draft: true 
-          prerelease: false
 
   build_release:
     name: Build Release
     runs-on: ${{ matrix.config.os }}
     permissions:
       contents: write
-    needs: create_release
     strategy:
       matrix:
           config:
-            - os: windows-latest
+            - os: windows-2022
+            - os: windows-11-arm
             - os: macos-latest
-            - os: ubuntu-20.04
-          python-version: [3.9]
+            - os: ubuntu-22.04
+            - os: ubuntu-24.04-arm
+          python-version: [3.13]
     
     env:
       CONAN_HOME: ${{ github.workspace }}/.conan-home
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v5
 
-      - name: Linux - Install prerequisites
-        if: "contains(matrix.config.os, 'ubuntu')"
+      - name: Linux - Install prerequisites (arm64)
+        if: "contains(matrix.config.os, 'ubuntu') && contains(matrix.config.os, 'arm')"
         run: |
+          sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
           sudo apt update
-          sudo apt install gcc-9-aarch64-linux-gnu g++-9-aarch64-linux-gnu
+          sudo apt install -y gcc-11 g++-11
           ls /usr/bin/ | grep aarch64
 
       - name: Set up Python
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
 
@@ -73,17 +60,24 @@ jobs:
           pip3 install -r requirements.txt
           conan profile detect
 
-      # The following step is copied from the build.yml.
-      # TODO: reuse if when needed (#17, #24)
-      # - name: Cache libclang
-      #   id: cache-libclang
-      #   uses: actions/cache@v3
-      #   env:
-      #     cache-name: cache-libclang
-      #   with:
-      #     path: .build/_deps/libclang-subbuild/libclang-populate-prefix/src/*.7z
-      #     key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('libclang/libclang-urls.txt') }}
+      # The following cache-related steps are copied from the build.yml.
+      - name: Set arch name
+        shell: bash
+        run: |
+          if [ "${{ runner.os }}" = "macOS" ]; then
+            echo "ARCH_NAME=universal" >> $GITHUB_ENV
+          else
+            echo "ARCH_NAME=${{ runner.arch }}" >> $GITHUB_ENV
+          fi
 
+      - name: Cache libclang 
+        id: cache-libclang
+        uses: actions/cache@v5
+        env:
+          cache-name: cache-libclang
+        with:
+          path: .libclang-cache/download/*.7z
+          key: ${{ runner.os }}-${{ env.ARCH_NAME }}-build-${{ env.cache-name }}-${{ hashFiles('libclang/libclang-urls.txt') }}
 
       - name: Windows - Configure & Build (Release)
         if: "contains(matrix.config.os, 'windows')"
@@ -92,72 +86,86 @@ jobs:
           python3 build.py configure
           python3 build.py build
 
-      - name: Windows - Archive Artifact
-        if: "contains(matrix.config.os, 'windows')"
+      - name: Windows - Archive Artifact (x86_64)
+        if: "contains(matrix.config.os, 'windows') && !contains(matrix.config.os, 'arm')"
         run: | 
           cd ${{github.workspace}}/.build/Release
           7z a -tzip opencl-language-server-win32-x86_64.zip opencl-language-server.exe
 
-      - name: Windows - Upload Artifact
-        if: "contains(matrix.config.os, 'windows')"
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{github.token}}
+      - name: Windows - Archive Artifact (arm64)
+        if: "contains(matrix.config.os, 'windows') && contains(matrix.config.os, 'arm')"
+        run: | 
+          cd ${{github.workspace}}/.build/Release
+          7z a -tzip opencl-language-server-win32-arm64.zip opencl-language-server.exe
+
+      - name: Windows - Upload Artifact (x86_64)
+        if: "contains(matrix.config.os, 'windows') && !contains(matrix.config.os, 'arm')"
+        uses: actions/upload-artifact@v7
         with:
-          upload_url: ${{needs.create_release.outputs.upload_url}}
-          asset_path: ${{github.workspace}}/.build/Release/opencl-language-server-win32-x86_64.zip
-          asset_name: opencl-language-server-win32-x86_64.zip
-          asset_content_type: application/zip
+          name: opencl-language-server-win32-x86_64.zip
+          path: ${{github.workspace}}/.build/Release/opencl-language-server-win32-x86_64.zip
+          retention-days: 1
+          archive: false
 
+      - name: Windows - Upload Artifact (arm64)
+        if: "contains(matrix.config.os, 'windows') && contains(matrix.config.os, 'arm')"
+        uses: actions/upload-artifact@v7
+        with:
+          name: opencl-language-server-win32-arm64.zip
+          path: ${{github.workspace}}/.build/Release/opencl-language-server-win32-arm64.zip
+          retention-days: 1
+          archive: false
 
-      - name: Linux - Configure & Build (Release)
-        if: "contains(matrix.config.os, 'ubuntu')"
+      - name: Linux - Configure & Build (Release - x86_64)
+        if: "contains(matrix.config.os, 'ubuntu') && !contains(matrix.config.os, 'arm')"
         run: |
           ./build.py conan-install -o .conan-x86_64 -pr:h profiles/linux.release.x86_64
           ./build.py configure -t .conan-x86_64/build/Release/generators/conan_toolchain.cmake -b .build-x86_64 -bt Release
           ./build.py build -b .build-x86_64
           file .build-x86_64/opencl-language-server
 
+      - name: Linux - Configure & Build (Release - arm64)
+        if: "contains(matrix.config.os, 'ubuntu') && contains(matrix.config.os, 'arm')"
+        run: |
           ./build.py conan-install -o .conan-armv8 -pr:h profiles/linux.release.armv8
           ./build.py configure -t .conan-armv8/build/Release/generators/conan_toolchain.cmake -b .build-armv8 -bt Release
           ./build.py build -b .build-armv8
           file .build-armv8/opencl-language-server
 
-      - name: Linux - Archive Artifact
-        if: "contains(matrix.config.os, 'ubuntu')"
+      - name: Linux - Archive Artifact (x86_64)
+        if: "contains(matrix.config.os, 'ubuntu') && !contains(matrix.config.os, 'arm')"
         run: |
           cd ${{github.workspace}}/.build-x86_64/
           tar -czvf opencl-language-server-linux-x86_64.tar.gz opencl-language-server
-          
+
+      - name: Linux - Archive Artifact (arm64)
+        if: "contains(matrix.config.os, 'ubuntu') && contains(matrix.config.os, 'arm')"
+        run: |
           cd ${{github.workspace}}/.build-armv8/
           tar -czvf opencl-language-server-linux-arm64.tar.gz opencl-language-server
 
       - name: Linux - Upload Artifact (x86_64)
-        if: "contains(matrix.config.os, 'ubuntu')"
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{github.token}}
+        if: "contains(matrix.config.os, 'ubuntu') && !contains(matrix.config.os, 'arm')"
+        uses: actions/upload-artifact@v7
         with:
-          upload_url: ${{needs.create_release.outputs.upload_url}}
-          asset_path: ${{github.workspace}}/.build-x86_64/opencl-language-server-linux-x86_64.tar.gz
-          asset_name: opencl-language-server-linux-x86_64.tar.gz
-          asset_content_type: application/gzip
+          name: opencl-language-server-linux-x86_64.tar.gz
+          path: ${{github.workspace}}/.build-x86_64/opencl-language-server-linux-x86_64.tar.gz
+          retention-days: 1
+          archive: false
       
       - name: Linux - Upload Artifact (armv8)
-        if: "contains(matrix.config.os, 'ubuntu')"
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{github.token}}
+        if: "contains(matrix.config.os, 'ubuntu') && contains(matrix.config.os, 'arm')"
+        uses: actions/upload-artifact@v7
         with:
-          upload_url: ${{needs.create_release.outputs.upload_url}}
-          asset_path: ${{github.workspace}}/.build-armv8/opencl-language-server-linux-arm64.tar.gz
-          asset_name: opencl-language-server-linux-arm64.tar.gz
-          asset_content_type: application/gzip
-
+          name: opencl-language-server-linux-arm64.tar.gz
+          path: ${{github.workspace}}/.build-armv8/opencl-language-server-linux-arm64.tar.gz
+          retention-days: 1
+          archive: false
 
       - name: Mac - Configure & Build (Release)
         if: "contains(matrix.config.os, 'macos')"
         run: |
+
           ./build.py conan-install -o .conan-x86_64 -pr:h profiles/darwin.release.x86_64
           ./build.py configure -t .conan-x86_64/build/Release/generators/conan_toolchain.cmake -b .build-x86_64 -bt Release
           ./build.py build -b .build-x86_64
@@ -187,51 +195,71 @@ jobs:
 
       - name: Mac - Upload Artifact (x86_64)
         if: "contains(matrix.config.os, 'macos')"
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{github.token}}
+        uses: actions/upload-artifact@v7
         with:
-          upload_url: ${{needs.create_release.outputs.upload_url}}
-          asset_path: ${{github.workspace}}/.build-x86_64/opencl-language-server-darwin-x86_64.tar.gz
-          asset_name: opencl-language-server-darwin-x86_64.tar.gz
-          asset_content_type: application/gzip
+          name: opencl-language-server-darwin-x86_64.tar.gz
+          path: ${{github.workspace}}/.build-x86_64/opencl-language-server-darwin-x86_64.tar.gz
+          retention-days: 1
+          archive: false
       
       - name: Mac - Upload Artifact (armv8)
         if: "contains(matrix.config.os, 'macos')"
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{github.token}}
+        uses: actions/upload-artifact@v7
         with:
-          upload_url: ${{needs.create_release.outputs.upload_url}}
-          asset_path: ${{github.workspace}}/.build-armv8/opencl-language-server-darwin-arm64.tar.gz
-          asset_name: opencl-language-server-darwin-arm64.tar.gz
-          asset_content_type: application/gzip
+          name: opencl-language-server-darwin-arm64.tar.gz
+          path: ${{github.workspace}}/.build-armv8/opencl-language-server-darwin-arm64.tar.gz
+          retention-days: 1
+          archive: false
       
       - name: Mac - Upload Artifact (universal)
         if: "contains(matrix.config.os, 'macos')"
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{github.token}}
+        uses: actions/upload-artifact@v7
         with:
-          upload_url: ${{needs.create_release.outputs.upload_url}}
-          asset_path: ${{github.workspace}}/.build-universal/opencl-language-server-darwin-universal.tar.gz
-          asset_name: opencl-language-server-darwin-universal.tar.gz
-          asset_content_type: application/gzip
-
+          name: opencl-language-server-darwin-universal.tar.gz
+          path: ${{github.workspace}}/.build-universal/opencl-language-server-darwin-universal.tar.gz
+          retention-days: 1
+          archive: false
 
       - name: Archive Licenses
-        if: "contains(matrix.config.os, 'ubuntu')"
+        if: "contains(matrix.config.os, 'ubuntu') && !contains(matrix.config.os, 'arm')"
         run: | 
           cd ${{github.workspace}}/.conan-x86_64
           tar -czvf licenses.tar.gz licenses
 
       - name: Upload Licenses
-        if: "contains(matrix.config.os, 'ubuntu')"
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{github.token}}
+        if: "contains(matrix.config.os, 'ubuntu') && !contains(matrix.config.os, 'arm')"
+        uses: actions/upload-artifact@v7
         with:
-          upload_url: ${{needs.create_release.outputs.upload_url}}
-          asset_path: ${{github.workspace}}/.conan-x86_64/licenses.tar.gz
-          asset_name: licenses.tar.gz
-          asset_content_type: application/gzip
+          name: licenses.tar.gz
+          path: ${{github.workspace}}/.conan-x86_64/licenses.tar.gz
+          retention-days: 1
+          archive: false
+
+  create_release:
+      runs-on: ubuntu-latest
+      needs: build_release
+      permissions:
+        contents: write
+      steps:
+        - name: Download Artifacts
+          uses: actions/download-artifact@v8
+          with:
+            skip-decompress: true
+            merge-multiple: true
+
+        - name: Create release
+          id: create_release
+          uses: softprops/action-gh-release@v3
+          with:
+            name: Release ${{github.ref}}
+            draft: true 
+            prerelease: false
+            files: |
+              licenses.tar.gz
+              opencl-language-server-linux-x86_64.tar.gz
+              opencl-language-server-linux-arm64.tar.gz
+              opencl-language-server-darwin-x86_64.tar.gz
+              opencl-language-server-darwin-arm64.tar.gz
+              opencl-language-server-darwin-universal.tar.gz
+              opencl-language-server-win32-x86_64.zip
+              opencl-language-server-win32-arm64.zip
