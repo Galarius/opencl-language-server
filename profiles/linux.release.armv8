@@ -1,4 +1,3 @@
-include(linux.common)
 include(linux.common.armv8)
 
 [settings]

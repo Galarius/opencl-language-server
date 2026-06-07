@@ -6,7 +6,7 @@ from conan.tools.files import load, copy, download
 from pathlib import Path
 import logging
 
-llvm_version = "15.0.0"
+llvm_version = "20.1.0"
 llvm_license_url = f"https://raw.githubusercontent.com/llvm/llvm-project/llvmorg-{llvm_version}/clang/LICENSE.TXT"
 
 def deploy(graph, output_folder, **kwargs):

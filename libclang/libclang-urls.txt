@@ -1,3 +1,6 @@
-APPLE;https://download.qt.io/development_releases/prebuilt/libclang/qt/libclang-release_15.0.0-based-mac.7z;8a944b4b65d2dca883fe539af5e5eef9a67e2abca91b28258fb08c46e3bb05b6
-WIN32;https://download.qt.io/development_releases/prebuilt/libclang/qt/libclang-release_15.0.0-based-windows-vs2019_64.7z;3cd73b31be503ec7281f1f8907f95392d1c8bd0a8c2c92c39dc177f8c3d02baf
-LINUX;https://download.qt.io/development_releases/prebuilt/libclang/qt/libclang-release_15.0.0-based-linux-Ubuntu20.04-gcc9.3-x86_64.7z;0cfdf3387b8917e99fbd81358a142daeb3bcb84c107c96f1508f257ee2082bda
+APPLE;universal;https://download.qt.io/development_releases/prebuilt/libclang/qt/libclang-llvmorg-20.1.0-macos-universal.7z;0bca8fe7e2f313e12a17ca3a6d44484c5dd5e2274038869398ed2eec36b8a9e4
+WIN32;x86_64;https://download.qt.io/development_releases/prebuilt/libclang/qt/libclang-llvmorg-20.1.0-windows-vs2022_64.7z;482b96fec874b6b05b76170d3094dc840be54afaa0cd98c9739eb15aae46532f
+WIN32;arm64;https://download.qt.io/development_releases/prebuilt/libclang/qt/libclang-llvmorg-20.1.0-windows-vs2022_arm64.7z;9a1d7b2ee4a202b9dd09916525638d4f867027a5fbb2b73d892ca745cddb780a
+LINUX;x86_64;https://download.qt.io/development_releases/prebuilt/libclang/qt/libclang-llvmorg-20.1.0-linux-Ubuntu22.04-gcc11.2-x86_64.7z;8c11a1487945a36ce302679f51c754fbd3ce5ef7822d0b405cb73accdfaf5489
+LINUX;arm64;https://download.qt.io/development_releases/prebuilt/libclang/qt/libclang-llvmorg-20.1.0-linux-Ubuntu24.04-gcc11.2-arm64.7z;0c6bb72612dbdac85629f153ec78710c8d8fcbe04196c4d9ef8da9250d59bd7b
+

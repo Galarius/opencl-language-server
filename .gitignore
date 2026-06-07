@@ -30,6 +30,7 @@ test_package/*
 
 ## build.py
 .build*
+.libclang-cache
 
 ## VS Code
 .vs

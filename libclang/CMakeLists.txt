@@ -2,57 +2,97 @@
 # add_subdirectory(libclang)
 # target_link_libraries(${TARGET} libclang-imported)
 
-# Define -DLLVM_ROOT_DIR=<path> if you have previously downloaded libclang manually
-if(DEFINED LLVM_ROOT_DIR AND NOT LLVM_ROOT_DIR STREQUAL "")
-  # LLVM_ROOT_DIR is already defined
+if(DEFINED CMAKE_SYSTEM_PROCESSOR)
+  set(_proc ${CMAKE_SYSTEM_PROCESSOR})
+elseif(DEFINED CMAKE_HOST_SYSTEM_PROCESSOR)
+  set(_proc ${CMAKE_HOST_SYSTEM_PROCESSOR})
 else()
-  # Download prebuilt static llvm & clang libraries
-  # TODO: prebuilt libs for Linux ARM are missing
-  file(STRINGS ${CMAKE_CURRENT_SOURCE_DIR}/libclang-urls.txt libclang_entries)
-  message(STATUS "Parsing ${CMAKE_CURRENT_SOURCE_DIR}/libclang-urls.txt...")
-  foreach(entry ${libclang_entries})
-    # Parse platform, URL, and hash
-    list(GET entry 0 platform)
-    list(GET entry 1 url_value)
-    list(GET entry 2 hash_value)
+  set(_proc "")
+endif()
 
-    if(platform STREQUAL "APPLE" AND APPLE)
+string(TOLOWER "${_proc}" _proc_l)
+set(IS_ARM64 OFF)
+if(_proc_l MATCHES "aarch64|arm64|armv8")
+  set(IS_ARM64 ON)
+endif()
+
+message(STATUS "ARCH: ${_proc}")
+
+# Download prebuilt static llvm & clang libraries
+file(STRINGS ${CMAKE_CURRENT_SOURCE_DIR}/libclang-urls.txt libclang_entries)
+message(STATUS "Parsing ${CMAKE_CURRENT_SOURCE_DIR}/libclang-urls.txt...")
+foreach(entry ${libclang_entries})
+  # Parse platform, URL, and hash
+  list(GET entry 0 platform)
+  list(GET entry 1 arch)
+  list(GET entry 2 url_value)
+  list(GET entry 3 hash_value)
+
+  if(platform STREQUAL "APPLE" AND APPLE)
+    set(libclang_url ${url_value})
+    set(libclang_hash ${hash_value})
+    break()
+  elseif(platform STREQUAL "WIN32" AND WIN32)
+
+    # Visual Studio generator may set CMAKE_VS_PLATFORM_NAME to "ARM64"
+    if(IS_ARM64 STREQUAL "OFF" AND DEFINED CMAKE_VS_PLATFORM_NAME)
+      string(TOLOWER "${CMAKE_VS_PLATFORM_NAME}" _vsplat_l)
+      if(_vsplat_l STREQUAL "arm64")
+        set(IS_ARM64 ON)
+      endif()
+    endif()
+
+    if(NOT IS_ARM64 AND arch MATCHES "x86_64|x64|amd64")
       set(libclang_url ${url_value})
       set(libclang_hash ${hash_value})
       break()
-    elseif(platform STREQUAL "WIN32" AND WIN32)
-      set(libclang_url ${url_value})
-      set(libclang_hash ${hash_value})
-      break()
-    elseif(platform STREQUAL "LINUX" AND LINUX)
+    elseif(arch STREQUAL _proc_l)
       set(libclang_url ${url_value})
       set(libclang_hash ${hash_value})
       break()
     endif()
-  endforeach()
 
-  message(STATUS "LIBCLANG URL: ${libclang_url}")
-  message(STATUS "LIBCLANG HASH: ${libclang_hash}")
+  elseif(platform STREQUAL "LINUX" AND LINUX)
+  
+    if(IS_ARM64 AND arch MATCHES "aarch64|arm64|armv8")
+      set(libclang_url ${url_value})
+      set(libclang_hash ${hash_value})
+      break()
+    elseif(arch STREQUAL _proc_l)
+      set(libclang_url ${url_value})
+      set(libclang_hash ${hash_value})
+      break()
+    endif()
 
-  include(FetchContent)
-  set(FETCHCONTENT_QUIET OFF)
+  endif()
+endforeach()
 
-  FetchContent_Declare(libclang
-      SOURCE_DIR prebuild
-      DOWNLOAD_EXTRACT_TIMESTAMP TRUE
-      TLS_VERIFY TRUE
-      URL ${libclang_url}
-      URL_HASH SHA256=${libclang_hash}
-    )
-    FetchContent_MakeAvailable(libclang)
-    set(LLVM_ROOT_DIR ${libclang_SOURCE_DIR})
+message(STATUS "Detected ARM64: ${IS_ARM64}")
+message(STATUS "LIBCLANG URL: ${libclang_url}")
+message(STATUS "LIBCLANG HASH: ${libclang_hash}")
 
-endif()
+include(FetchContent)
+set(FETCHCONTENT_QUIET OFF)
 
-message(STATUS "LLVM root directory: ${LLVM_ROOT_DIR}")
+set(LIBCLANG_CACHE_DIR "${CMAKE_SOURCE_DIR}/.libclang-cache")
+
+FetchContent_Declare(libclang
+    SOURCE_DIR "${LIBCLANG_CACHE_DIR}/prebuild"
+    DOWNLOAD_DIR "${LIBCLANG_CACHE_DIR}/download"
+    DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+    TLS_VERIFY TRUE
+    URL ${libclang_url}
+    URL_HASH SHA256=${libclang_hash}
+)
+FetchContent_MakeAvailable(libclang)
+set(LLVM_ROOT_DIR "${LIBCLANG_CACHE_DIR}/prebuild")
+set(LLVM_ROOT_DIR "${LLVM_ROOT_DIR}" PARENT_SCOPE)
 
 set(cmake_llvm "${LLVM_ROOT_DIR}/lib/cmake/llvm")
 set(cmake_clang "${LLVM_ROOT_DIR}/lib/cmake/clang")
+
+message(STATUS "LLVM root directory: ${LLVM_ROOT_DIR}")
+
 list(APPEND CMAKE_MODULE_PATH ${cmake_llvm} ${cmake_clang})
 include(LLVMConfig)
 include(ClangConfig)
@@ -114,7 +154,7 @@ endif()
 
 message(STATUS "LLVM parsed definitions: ${llvm_definitions_list}")
 
-set(llvm_components ${LLVM_NATIVE_ARCH} ${LLVM_NATIVE_ARCH}TargetMCA core)
+set(llvm_components ${LLVM_NATIVE_ARCH} core)
 llvm_map_components_to_libnames(llvm_libs ${llvm_components})
 set(clang_libraries clangAnalysis clangAnalysisFlowSensitive clangAnalysisFlowSensitiveModels clangAPINotes clangARCMigrate clangAST clangASTMatchers clangBasic clangCodeGen clangCrossTU clangDependencyScanning clangDirectoryWatcher clangDriver clangDynamicASTMatchers clangEdit clangExtractAPI clangFormat clangFrontend clangFrontendTool clangHandleCXX clangHandleLLVM clangIndex clangIndexSerialization clangInterpreter clangLex clangParse clangRewrite clangRewriteFrontend clangSema clangSerialization clangStaticAnalyzerCheckers clangStaticAnalyzerCore clangStaticAnalyzerFrontend clangSupport clangTooling clangToolingASTDiff clangToolingCore clangToolingInclusions clangToolingRefactoring clangToolingSyntax clangTransformer)
 

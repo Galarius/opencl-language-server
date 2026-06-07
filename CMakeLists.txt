@@ -6,8 +6,12 @@ string(STRIP ${VERSION_OUTPUT} PACKAGE_VERSION)
 project(opencl-language-server
     DESCRIPTION "OpenCL Language Server"
     VERSION ${PACKAGE_VERSION}
-    LANGUAGES CXX
+    LANGUAGES C CXX
 )
+
+if(APPLE)
+    set(CMAKE_OSX_DEPLOYMENT_TARGET "12.0")
+endif()
 
 if(NOT CMAKE_CXX_STANDARD) 
     set(CMAKE_CXX_STANDARD 17)
@@ -53,8 +57,7 @@ find_package(nlohmann_json REQUIRED)
 find_package(CLI11 REQUIRED)
 find_package(uriparser REQUIRED)
 
-# libclang is not currently used, uncomment when needed (#17, #24)
-# add_subdirectory(libclang)
+add_subdirectory(libclang)
 
 if(ENABLE_TESTING)
     find_package(GTest REQUIRED)
@@ -119,9 +122,7 @@ target_compile_definitions(${PROJECT_NAME} PRIVATE
 endif()
 
 
-target_link_libraries(${PROJECT_NAME} ${conan_libs} 
-    # libclang-imported
-)
+target_link_libraries(${PROJECT_NAME} ${conan_libs} libclang-imported)
 target_include_directories(${PROJECT_NAME} PRIVATE 
     "${PROJECT_SOURCE_DIR}/include"
     ${CMAKE_CURRENT_BINARY_DIR}
