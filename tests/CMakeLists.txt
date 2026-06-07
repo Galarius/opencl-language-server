@@ -5,12 +5,14 @@ set(sources
     log.cpp
     lsp.cpp
     utils.cpp
+    completion.cpp
 )
 list(TRANSFORM sources PREPEND "${PROJECT_SOURCE_DIR}/src/")
 set(test_sources
     jsonrpc-tests.cpp
     diagnostics-parser-tests.cpp
     diagnostics-tests.cpp
+    completion-tests.cpp
     lsp-event-handler-tests.cpp
     utils-tests.cpp
     main.cpp
@@ -44,10 +46,11 @@ endif()
 target_compile_definitions(${TESTS_PROJECT_NAME} PRIVATE 
     ENABLE_TESTING=1
 )
-target_link_libraries (${TESTS_PROJECT_NAME} ${libs} libclang-imported)
+target_link_libraries (${TESTS_PROJECT_NAME} ${libs} libclang-imported embedded_resources)
 target_include_directories(${TESTS_PROJECT_NAME} PRIVATE 
     "${PROJECT_SOURCE_DIR}/include"
     "${CMAKE_CURRENT_SOURCE_DIR}/mocks"
+    "${PROJECT_BINARY_DIR}"
 )
 if(APPLE)
     target_include_directories(${TESTS_PROJECT_NAME} PRIVATE "${OpenCL_INCLUDE_DIRS}")

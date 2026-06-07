@@ -15,8 +15,10 @@ namespace ocls {
 struct LogName
 {
     static std::string main;
+    static std::string hdiscovery;
     static std::string clinfo;
     static std::string diagnostics;
+    static std::string completion;
     static std::string jrpc;
     static std::string lsp;
 };

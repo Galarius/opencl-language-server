@@ -6,8 +6,11 @@
 //
 
 #include <iostream>
+#include <fstream>
+#include <filesystem>
 
 #include "clinfo.hpp"
+#include "completion.hpp"
 #include "diagnostics.hpp"
 #include "jsonrpc.hpp"
 #include "log.hpp"
@@ -25,6 +28,8 @@
 #endif
 
 using namespace ocls;
+
+namespace fs = std::filesystem;
 
 namespace {
 
@@ -89,6 +94,12 @@ struct DiagnosticsSubCommand final : public SubCommand
 
     int Execute(const std::shared_ptr<IDiagnostics>& diagnostics)
     {
+        if (!fs::exists(kernel))
+        {
+            std::cerr << "Kernel file does not exist" << std::endl;
+            return EXIT_FAILURE;
+        }
+
         auto content = utils::ReadFileContent(kernel);
         if (!content.has_value())
         {
@@ -141,6 +152,146 @@ private:
     bool json = false;
 };
 
+struct CompletionSubCommand final : public SubCommand
+{
+    CompletionSubCommand(CLI::App& app) : SubCommand(app, "completion", "Provides an OpenCL kernel completions")
+    {
+        cmd->add_flag("-j,--json", json, "Print diagnostics in JSON format");
+        cmd->add_option("-k,--kernel", kernel, "Path to a kernel file")->required(true);
+
+        // https://clang.llvm.org/docs/ClangCommandLineReference.html
+        cmd->add_option("--cl-std", clVersion, "OpenCL version")
+            ->check(
+                CLI::IsMember(
+                    {"cl",
+                     "CL",
+                     "cl1.0",
+                     "CL1.0",
+                     "cl1.1",
+                     "CL1.1",
+                     "cl1.2",
+                     "CL1.2",
+                     "cl2.0",
+                     "CL2.0",
+                     "cl3.0",
+                     "CL3.0",
+                     "clc++",
+                     "CLC++",
+                     "clc++1.0",
+                     "CLC++1.0",
+                     "clc++2021",
+                     "CLC++2021"}))
+            ->required(true)
+            ->capture_default_str();
+        cmd->add_option("-l,--line", line, "line number (1-based)")->required(true)->capture_default_str();
+        cmd->add_option("-c,--column", column, "column number (1-based)")->required(true)->capture_default_str();
+    }
+
+    int Execute()
+    {
+        try
+        {
+            auto completion = CreateCompletion();
+            auto options = BuildDefaultTranslationOptions(clVersion);
+            completion->SaveHeaders();
+            completion->SetTranslationOptions(options);
+
+            if (!fs::exists(kernel))
+            {
+                std::cerr << "Kernel file does not exist" << std::endl;
+                return EXIT_FAILURE;
+            }
+
+            auto content = utils::ReadFileContent(kernel);
+            if (!content.has_value())
+            {
+                return EXIT_FAILURE;
+            }
+            completion->OnFileOpen(kernel, *content);
+            auto completions = completion->GetCompletions(kernel, line, column);
+            completion->OnFileClose(kernel);
+
+            if (json)
+            {
+                nlohmann::json completionItems = nlohmann::json::array();
+                for (const auto& item : completions)
+                {
+                    completionItems.emplace_back(item.toJson());
+                }
+                std::cout << completionItems.dump(4) << std::endl;
+            }
+            else
+            {
+                std::cout << "#" << ", "
+                          << "label" << ", "
+                          << "detail" << ", "
+                          << "insertText" << ", "
+                          << "isSnippet" << ", "
+                          << "documentation" << ", "
+                          << "itemKind" << ", "
+                          << "sortText" << ", "
+                          << "deprecated" << ", "
+                          << "commitCharacters" << ", "
+                          << "tags" << ", "
+                          << "preselect" << std::endl;
+
+                int index = 1;
+
+                for (auto& item : completions)
+                {
+                    std::string commitCharsStr = "[";
+                    for (const auto& ch : item.commitCharacters)
+                    {
+                        commitCharsStr += "'" + ch + "', ";
+                    }
+                    if (!item.commitCharacters.empty())
+                    {
+                        commitCharsStr.pop_back();
+                        commitCharsStr.pop_back();
+                    }
+                    commitCharsStr += "]";
+
+                    // convert tags to string for printing
+                    std::string tagsStr = "[";
+                    for (const auto& tag : item.tags)
+                    {
+                        tagsStr += std::to_string(tag) + ", ";
+                    }
+                    if (!item.tags.empty())
+                    {
+                        tagsStr.pop_back();
+                        tagsStr.pop_back();
+                        tagsStr.pop_back();
+                    }
+                    tagsStr += "]";
+
+                    std::cout << index++ << ", " << item.label << ", " << item.detail << ", " << item.insertText << ", "
+                              << utils::FormatBool(item.isSnippet) << ", " << item.documentation << ", "
+                              << static_cast<unsigned>(item.itemKind) << ", " << item.sortText << ", "
+                              << utils::FormatBool(item.deprecated) << ", " << commitCharsStr << ", " << tagsStr << ", "
+                              << utils::FormatBool(item.preselect) << std::endl;
+                }
+                std::cout << std::endl;
+            }
+        }
+        catch (std::exception& err)
+        {
+            std::cerr << "Failed to get completion: " << err.what() << std::endl;
+            return EXIT_FAILURE;
+        }
+
+        return EXIT_SUCCESS;
+    }
+
+private:
+    std::string kernel;
+    uint32_t line = 0;
+    uint32_t column = 0;
+    std::string openclHeaderPath;
+    std::string clVersion;
+    bool json = false;
+};
+
 std::shared_ptr<ILSPServer> server;
 
 static void SignalHandler(int)
@@ -183,13 +334,14 @@ int main(int argc, char* argv[])
     app.add_flag("-e,--enable-file-logging", flagLogTofile, "Enable file logging");
     app.add_option("-f,--log-file", optLogFile, "Path to log file")->required(false)->capture_default_str();
     app.add_option("-l,--log-level", optLogLevel, "Log level")
-        ->check(CLI::IsMember(
-            {spdlog::level::trace,
-             spdlog::level::debug,
-             spdlog::level::info,
-             spdlog::level::warn,
-             spdlog::level::err,
-             spdlog::level::critical}))
+        ->check(
+            CLI::IsMember(
+                {spdlog::level::trace,
+                 spdlog::level::debug,
+                 spdlog::level::info,
+                 spdlog::level::warn,
+                 spdlog::level::err,
+                 spdlog::level::critical}))
         ->required(false)
         ->capture_default_str();
     app.add_flag("--stdio", flagStdioMode, "Use stdio transport channel for the language server");
@@ -203,8 +355,9 @@ int main(int argc, char* argv[])
 
     CLInfoSubCommand clInfoCmd(app);
     DiagnosticsSubCommand diagnosticsCmd(app);
+    CompletionSubCommand completionCmd(app);
     CLI11_PARSE(app, argc, argv);
-    if(flagLogTofile)
+    if (flagLogTofile)
     {
         ConfigureFileLogging(optLogFile, optLogLevel);
     }
@@ -212,11 +365,15 @@ int main(int argc, char* argv[])
     {
         ConfigureNullLogging();
     }
+    
+    spdlog::get(LogName::main)->info("OpenCL Language Server {}", ocls::version);
+    spdlog::get(LogName::main)->info("{}", GetClangVersion());
 
     auto clinfo = CreateCLInfo();
 
     int result = 0;
-    do {
+    do
+    {
         if (clInfoCmd.IsParsed())
         {
             result = clInfoCmd.Execute(clinfo);
@@ -230,13 +387,24 @@ int main(int argc, char* argv[])
             break;
         }
 
+        if (completionCmd.IsParsed())
+        {
+            return completionCmd.Execute();
+        }
+
         SetupBinaryStreamMode();
         std::signal(SIGINT, SignalHandler);
 
         auto jrpc = CreateJsonRPC();
-        server = CreateLSPServer(jrpc, diagnostics);
-        result = server->Run();
 
+        auto device = diagnostics->GetDevice();
+        auto clStandard = device->GetCLStandard();
+        auto options = BuildDefaultTranslationOptions(clStandard);
+        auto completion = CreateCompletion();
+        completion->SaveHeaders();
+        completion->SetTranslationOptions(options);
+        server = CreateLSPServer(jrpc, diagnostics, completion);
+        result = server->Run();
     } while (false);
 
     spdlog::get(LogName::main)->info("Shutting down...\n\n");

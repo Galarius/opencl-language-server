@@ -11,6 +11,7 @@
 
 #include <array>
 #include <sstream>
+#include <regex>
 #include <unordered_map>
 
 using namespace nlohmann;
@@ -338,26 +339,30 @@ json::object_t GetDeviceJSONInfo(const cl::Device& device)
                     for (size_t i = 0; i < values.size(); ++i)
                     {
                         auto value = values[i];
-                        switch(value) {
+                        switch (value)
+                        {
                             case CL_DEVICE_PARTITION_EQUALLY:
                             case CL_DEVICE_PARTITION_BY_AFFINITY_DOMAIN:
                                 partitionProperties.emplace_back(devicePartitionPropertyChoices.at(value));
-                                if(i + 1 < values.size()) {
+                                if (i + 1 < values.size())
+                                {
                                     partitionProperties.emplace_back(std::to_string(values[i++]));
                                 }
-                            break;
+                                break;
                             case CL_DEVICE_PARTITION_BY_COUNTS:
                                 partitionProperties.emplace_back(devicePartitionPropertyChoices.at(value));
-                                while(i + 1 < values.size() && values[i + 1] != CL_DEVICE_PARTITION_BY_COUNTS_LIST_END) {
+                                while (i + 1 < values.size() && values[i + 1] != CL_DEVICE_PARTITION_BY_COUNTS_LIST_END)
+                                {
                                     partitionProperties.emplace_back(std::to_string(values[i++]));
                                 }
-                            break;
+                                break;
                             case 0:
-                                // The device cannot be partitioned (i.e. there is no partitioning scheme supported by the device that will return at least two sub-devices)
-                            break;
+                                // The device cannot be partitioned (i.e. there is no partitioning scheme supported by
+                                // the device that will return at least two sub-devices)
+                                break;
                             default:
                                 logger()->warn("Unexpected value '{}' (property '{}')", value, property.name);
-                            break;
+                                break;
                         }
                     }
                     info[property.name] = partitionProperties;
@@ -376,7 +381,7 @@ json::object_t GetDeviceJSONInfo(const cl::Device& device)
         {
             logger()->error("Failed to get info for the property '{}', {}", property.name, err.what());
         }
-        catch (const std::out_of_range &err) 
+        catch (const std::out_of_range& err)
         {
             logger()->error("Unexpected value for the property '{}', {}", property.name, err.what());
         }
@@ -475,6 +480,48 @@ size_t GetDevicePowerIndex(const cl::Device& device)
     return 0;
 }
 
+std::string GetCLStandard(const cl::Device& device)
+{
+    // Check if the device compiler supports C++ for OpenCL (CLC++)
+    std::string extensions = device.getInfo<CL_DEVICE_EXTENSIONS>();
+    // Check if OpenCL C++ is supported at all
+    if (extensions.find("cl_khr_extended_versioning") != std::string::npos)
+    {
+        // Use the hardware platform generation to separate C++ versions
+        std::string hardware_ver = device.getInfo<CL_DEVICE_VERSION>(); // e.g. "OpenCL 3.0", "OpenCL 2.0"
+        if (hardware_ver.find("3.0") != std::string::npos)
+        {
+            return "CLC++2021"; // OpenCL 3.0 devices default to clc++2021
+        }
+        else
+        {
+            return "CLC++"; // Legacy OpenCL 2.x devices default to original clc++
+        }
+    }
+
+
+    // Fall back to the standard OpenCL C Language Compiler Version
+    // This string follows the format: "OpenCL C <major>.<minor> <vendor_info>"
+    std::string c_version = device.getInfo<CL_DEVICE_OPENCL_C_VERSION>();
+
+    std::regex re(R"(OpenCL\s+C\s+(\d+\.\d+))");
+    std::smatch match;
+    if (std::regex_search(c_version, match, re))
+    {
+        std::string parsed_ver = match[1];
+        // Clang returns NULL if passed "-cl-std=CL2.1" or "CL2.2"
+        // Filter out "2.1" and "2.2" just in case (CL_DEVICE_OPENCL_C_VERSION should not return these versions)
+        if (parsed_ver == "2.1" || parsed_ver == "2.2")
+        {
+            return "CL2.0";
+        }
+        // Return structured Clang flags (e.g., "CL1.2", "CL3.0")
+        return "CL" + parsed_ver;
+    }
+
+    return "CL";
+}
+
 std::string GetDeviceDescription(const cl::Device& device)
 {
     try
@@ -500,7 +547,8 @@ std::string GetDeviceDescription(const cl::Device& device)
 json GetDevicesJSONInfo(const std::vector<cl::Device>& devices)
 {
     logger()->trace("Getting devices info...");
-    if( devices.size() == 0 ) {
+    if (devices.size() == 0)
+    {
         return json::array({});
     }
 
@@ -600,7 +648,11 @@ public:
 
                 auto deviceToOclsDevice = [](const cl::Device& device) {
                     return ocls::Device(
-                        device, CalculateDeviceID(device), GetDeviceDescription(device), GetDevicePowerIndex(device));
+                        device,
+                        CalculateDeviceID(device),
+                        GetDeviceDescription(device),
+                        GetDevicePowerIndex(device),
+                        GetCLStandard(device));
                 };
 
                 std::transform(

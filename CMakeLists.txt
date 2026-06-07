@@ -58,6 +58,7 @@ find_package(CLI11 REQUIRED)
 find_package(uriparser REQUIRED)
 
 add_subdirectory(libclang)
+add_subdirectory(res)
 
 if(ENABLE_TESTING)
     find_package(GTest REQUIRED)
@@ -70,6 +71,7 @@ set(headers
     clinfo.hpp
     device.hpp
     diagnostics.hpp
+    completion.hpp
     jsonrpc.hpp
     log.hpp
     lsp.hpp
@@ -78,6 +80,7 @@ set(headers
 set(sources
     clinfo.cpp
     diagnostics.cpp
+    completion.cpp
     jsonrpc.cpp
     log.cpp
     lsp.cpp
@@ -122,10 +125,10 @@ target_compile_definitions(${PROJECT_NAME} PRIVATE
 endif()
 
 
-target_link_libraries(${PROJECT_NAME} ${conan_libs} libclang-imported)
+target_link_libraries(${PROJECT_NAME} ${conan_libs} libclang-imported embedded_resources)
 target_include_directories(${PROJECT_NAME} PRIVATE 
     "${PROJECT_SOURCE_DIR}/include"
-    ${CMAKE_CURRENT_BINARY_DIR}
+    "${CMAKE_CURRENT_BINARY_DIR}"
 )
 if(APPLE)
     target_include_directories(${PROJECT_NAME} PRIVATE "${OpenCL_INCLUDE_DIRS}")

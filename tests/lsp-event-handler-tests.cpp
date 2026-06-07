@@ -10,6 +10,7 @@
 #include "exit-handler-mock.hpp"
 #include "jsonrpc-mock.hpp"
 #include "diagnostics-mock.hpp"
+#include "completion-mock.hpp"
 #include "generator-mock.hpp"
 
 #include <gtest/gtest.h>
@@ -26,6 +27,7 @@ class LSPTest : public ::testing::Test
 protected:
     std::shared_ptr<JsonRPCMock> mockJsonRPC;
     std::shared_ptr<DiagnosticsMock> mockDiagnostics;
+    std::shared_ptr<CompletionMock> mockCompletion;
     std::shared_ptr<GeneratorMock> mockGenerator;
     std::shared_ptr<ExitHandlerMock> mockExitHandler;
     std::shared_ptr<ILSPServerEventsHandler> handler;
@@ -34,12 +36,16 @@ protected:
     {
         mockJsonRPC = std::make_shared<JsonRPCMock>();
         mockDiagnostics = std::make_shared<DiagnosticsMock>();
+        mockCompletion = std::make_shared<CompletionMock>();
         mockGenerator = std::make_shared<GeneratorMock>();
         mockExitHandler = std::make_shared<ExitHandlerMock>();
 
-        ON_CALL(*mockGenerator, GenerateID()).WillByDefault(::testing::Return("12345678"));
+        auto device = ocls::Device(12345678, "Some Device", 128, "3.0");
 
-        handler = CreateLSPEventsHandler(mockJsonRPC, mockDiagnostics, mockGenerator, mockExitHandler);
+        ON_CALL(*mockGenerator, GenerateID()).WillByDefault(::testing::Return("12345678"));
+        ON_CALL(*mockDiagnostics, GetDevice()).WillByDefault(::testing::Return(device));
+
+        handler = CreateLSPEventsHandler(mockJsonRPC, mockDiagnostics, mockCompletion, mockGenerator, mockExitHandler);
     }
 
     std::tuple<std::string, std::string> GetTestSource() const
@@ -124,6 +130,10 @@ TEST_F(LSPTest, OnInitialize_shouldBuildResponse_andCallDiagnosticsSetters)
                     "willSave": false,
                     "willSaveWaitUntil": false,
                     "save": false
+                },
+                "completionProvider": {
+                    "resolveProvider": true,
+                    "triggerCharacters": [".", ":"]
                 }
             }
         }
@@ -171,6 +181,10 @@ TEST_F(LSPTest, OnInitialize_withMissingConfigurationFields_shouldBuildResponse_
                     "willSave": false,
                     "willSaveWaitUntil": false,
                     "save": false
+                },
+                "completionProvider": {
+                    "resolveProvider": true,
+                    "triggerCharacters": [".", ":"]
                 }
             }
         }
@@ -258,11 +272,12 @@ TEST_F(LSPTest, BuildDiagnosticsRespond_shouldBuildResponse)
     auto [uri, content] = GetTestSource();
     auto expectedDiagnostics = GetTestDiagnostics(uri);
     auto expectedResponse = GetTestDiagnosticsResponse(uri);
+    auto filePath = utils::UriToFilePath(uri);
 
     ON_CALL(*mockDiagnostics, GetDiagnostics(testing::_)).WillByDefault(::testing::Return(expectedDiagnostics));
     EXPECT_CALL(*mockDiagnostics, GetDiagnostics(Source {uri, content})).Times(1);
 
-    handler->BuildDiagnosticsRespond(uri, content);
+    handler->BuildDiagnosticsRespond(uri, filePath, content);
     auto response = handler->GetNextResponse();
 
     EXPECT_TRUE(response.has_value());
@@ -272,14 +287,16 @@ TEST_F(LSPTest, BuildDiagnosticsRespond_shouldBuildResponse)
 TEST_F(LSPTest, BuildDiagnosticsRespond_withException_shouldReplyWithError)
 {
     auto [uri, content] = GetTestSource();
+    auto filePath = utils::UriToFilePath(uri);
     Source expectedSource {uri, content};
 
-    ON_CALL(*mockDiagnostics, GetDiagnostics(testing::_)).WillByDefault(::testing::Throw(std::runtime_error("Exception")));
+    ON_CALL(*mockDiagnostics, GetDiagnostics(testing::_))
+        .WillByDefault(::testing::Throw(std::runtime_error("Exception")));
     EXPECT_CALL(*mockDiagnostics, GetDiagnostics(expectedSource)).Times(1);
     EXPECT_CALL(*mockJsonRPC, WriteError(JRPCErrorCode::InternalError, "Failed to get diagnostics: Exception"))
         .Times(1);
 
-    handler->BuildDiagnosticsRespond(uri, content);
+    handler->BuildDiagnosticsRespond(uri, filePath, content);
 }
 
 // OnTextOpen
