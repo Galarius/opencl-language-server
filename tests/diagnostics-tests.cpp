@@ -23,14 +23,14 @@ const uint32_t deviceID2 = 23456789;
 
 std::vector<Device> GetTestDevices()
 {
-    return {Device(deviceID1, "Test Device 1", 10), Device(deviceID2, "Test Device 2", 20)};
+    return {Device(deviceID1, "Test Device 1", 10, "CL2.0"), Device(deviceID2, "Test Device 2", 20, "CL3.0")};
 }
 
 class DiagnosticsTest : public ::testing::Test
 {
 protected:
     std::shared_ptr<CLInfoMock> mockCLInfo;
-    
+
     void SetUp() override
     {
         mockCLInfo = std::make_shared<CLInfoMock>();
@@ -42,7 +42,7 @@ protected:
 TEST_F(DiagnosticsTest, SelectDeviceBasedOnPowerIndexDuringTheCreation)
 {
     EXPECT_CALL(*mockCLInfo, GetDevices()).WillOnce(Return(GetTestDevices()));
-    
+
     auto diagnostics = CreateDiagnostics(mockCLInfo);
 
     ASSERT_TRUE(diagnostics->GetDevice().has_value());
@@ -52,7 +52,7 @@ TEST_F(DiagnosticsTest, SelectDeviceBasedOnPowerIndexDuringTheCreation)
 TEST_F(DiagnosticsTest, SelectDeviceBasedOnPowerIndex)
 {
     EXPECT_CALL(*mockCLInfo, GetDevices()).Times(2).WillRepeatedly(Return(GetTestDevices()));
-    
+
     auto diagnostics = CreateDiagnostics(mockCLInfo);
     diagnostics->SetOpenCLDevice(0);
 

@@ -1,10 +1,9 @@
 # OpenCL Language Server
 
-![Build status](https://github.com/galarius/opencl-language-server/actions/workflows/build.yml/badge.svg)
-
 ## Supported Capabilities:
 
-- [x] `textDocument/publishDiagnostics`
+- [x] [`textDocument/publishDiagnostics`](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_publishDiagnostics)
+- [x] [`textDocument/completion`](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_completion)
 
 ## Prerequisites
 
@@ -41,6 +40,37 @@ You can configure diagnostics with `json-rpc` request during the intitialization
 | `deviceID` | Device ID or 0 (automatic selection) of the OpenCL device to be used for diagnostics. |
 | |  *Run `./opencl-language-server clinfo` to get information about available OpenCL devices including identifiers.* |
 | `maxNumberOfProblems` | Controls the maximum number of errors parsed by the language server. |
+
+## CLI
+
+The language server communicates with a client using JSON-RPC protocol.  
+Optionally, you can use subcommands to access functionality without starting the
+server.
+
+```
+.build/Debug/opencl-language-server [OPTIONS] [SUBCOMMANDS]
+
+
+OPTIONS:
+  -h,     --help              Print this help message and exit
+  -e,     --enable-file-logging 
+                              Enable file logging
+  -f,     --log-file TEXT [opencl-language-server.log]  
+                              Path to log file
+  -l,     --log-level ENUM:{0,1,2,3,4,5} [0]  
+                              Log level
+          --stdio             Use stdio transport channel for the language server
+  -v,     --version           Show version
+
+SUBCOMMANDS:
+  clinfo                      Show information about available OpenCL devices
+  diagnostics                 Provides an OpenCL kernel diagnostics
+  completion                  Provides an OpenCL kernel completions
+```
+
+## Clients
+
+[vscode-opencl](https://github.com/Galarius/vscode-opencl) - OpenCL for Visual Studio Code
 
 ## Development
 

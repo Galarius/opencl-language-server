@@ -9,7 +9,7 @@
 #include "utils.hpp"
 
 #if defined(__APPLE__)
-#include "oslogger.hpp"
+    #include "oslogger.hpp"
 #endif
 
 #include <iostream>
@@ -21,8 +21,10 @@
 namespace ocls {
 
 std::string LogName::main = "opencl-ls";
+std::string LogName::hdiscovery = "hdiscovery";
 std::string LogName::clinfo = "clinfo";
 std::string LogName::diagnostics = "diagnostics";
+std::string LogName::completion = "completion";
 std::string LogName::jrpc = "jrpc";
 std::string LogName::lsp = "lsp";
 
@@ -48,11 +50,12 @@ void ConfigureLogging(bool fileLogging, const std::string& filename, spdlog::lev
         spdlog::set_default_logger(std::make_shared<spdlog::logger>(LogName::main, sinks.begin(), sinks.end()));
         spdlog::set_level(level);
         std::vector<std::shared_ptr<spdlog::logger>> subLoggers = {
+            std::make_shared<spdlog::logger>(LogName::hdiscovery, sinks.begin(), sinks.end()),
             std::make_shared<spdlog::logger>(LogName::clinfo, sinks.begin(), sinks.end()),
             std::make_shared<spdlog::logger>(LogName::diagnostics, sinks.begin(), sinks.end()),
+            std::make_shared<spdlog::logger>(LogName::completion, sinks.begin(), sinks.end()),
             std::make_shared<spdlog::logger>(LogName::jrpc, sinks.begin(), sinks.end()),
-            std::make_shared<spdlog::logger>(LogName::lsp, sinks.begin(), sinks.end())
-        };
+            std::make_shared<spdlog::logger>(LogName::lsp, sinks.begin(), sinks.end())};
 
         for (const auto& logger : subLoggers)
         {

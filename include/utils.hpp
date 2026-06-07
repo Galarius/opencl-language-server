@@ -51,6 +51,20 @@ inline std::string FormatBool(bool flag)
     return flag ? "yes" : "no";
 }
 
+inline std::string FormatVector(const std::vector<std::string>& vec)
+{
+    std::string buffer;
+    for (auto& value : vec)
+    {
+        buffer += value + ",";
+    }
+    if (!vec.empty())
+    {
+        buffer.pop_back();
+    }
+    return buffer;
+}
+
 // --- File Helpers ---
 
 std::string UriToFilePath(const std::string& uri, bool isUnix);
