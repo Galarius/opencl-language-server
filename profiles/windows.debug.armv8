@@ -1,4 +1,4 @@
-include(linux.common.armv8)
+include(windows.common)
 
 [settings]
 arch=armv8

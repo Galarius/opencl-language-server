@@ -4,7 +4,11 @@ import platform
 
 
 def map_uname_arch_to_conan_arch(arch):
-    map = {"arm64": "armv8", "amd64": "x86_64"}
+    map = {
+        "arm64": "armv8", 
+        "aarch64": "armv8",
+        "amd64": "x86_64"
+    }
     return map[arch] if arch in map.keys() else arch
 
 
