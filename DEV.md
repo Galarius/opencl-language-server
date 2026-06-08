@@ -30,7 +30,7 @@ conan profile detect
 
 ```bat
 python.exe -m venv .pyenv
-.pyenv/Scripts/activate.bat
+.pyenv\Scripts\activate.bat
 pip.exe install -r requirements.txt
 set CONAN_HOME=$(pwd)/.conan-home
 conan.exe profile detect
@@ -53,19 +53,26 @@ conan.exe profile detect
 
 ### Build a fat binary (x86_64 + armv8)
 
-```shell
- ./build.py conan-install -o .conan-x86_64 -pr:h profiles/darwin.release.x86_64
- ./build.py configure -t .conan-x86_64/build/Release/generators/conan_toolchain.cmake -b .build-x86_64 -bt Release
- ./build.py build -b .build-x86_64
+```sh
+./build.py conan-install -o .conan-x86_64 -pr:h profiles/darwin.release.x86_64
+./build.py configure -t .conan-x86_64/build/Release/generators/conan_toolchain.cmake -b .build-x86_64 -bt Release
+./build.py build -b .build-x86_64
 
- ./build.py conan-install -o .conan-armv8 -pr:h profiles/darwin.release.armv8
- ./build.py configure -t .conan-armv8/build/Release/generators/conan_toolchain.cmake -b .build-armv8 -bt Release
- ./build.py build -b .build-armv8
+./build.py conan-install -o .conan-armv8 -pr:h profiles/darwin.release.armv8
+./build.py configure -t .conan-armv8/build/Release/generators/conan_toolchain.cmake -b .build-armv8 -bt Release
+./build.py build -b .build-armv8
 
- mkdir -p .build-universal/
- lipo -create -output .build-universal/opencl-language-server .build-x86_64/opencl-language-server .build-armv8/opencl-language-server
- lipo -archs .build-universal/opencl-language-server 
+mkdir -p .build-universal/
+lipo -create -output .build-universal/opencl-language-server .build-x86_64/opencl-language-server .build-armv8/opencl-language-server
+lipo -archs .build-universal/opencl-language-server 
  ```
+
+### Generate Xcode project
+
+```sh
+./build.py conan-install -pr:h profiles/darwin.debug.x86_64 -pr:h profiles/darwin.debug.armv8 -w
+cmake -G Xcode -DCMAKE_TOOLCHAIN_FILE=".conan-install/build/Debug/generators/conan_toolchain.cmake" -DENABLE_TESTING=ON -B .build
+```
 
 ### Signing
 
@@ -88,22 +95,21 @@ xcrun altool --notarization-info ${REQUEST_ID} --password "@keychain:AC_PASSWORD
 ### Cross compilation (x86_64 -> armv8)
 
 ```shell
-sudo apt install gcc-9-aarch64-linux-gnu g++-9-aarch64-linux-gnu
+sudo apt install gcc-11-aarch64-linux-gnu g++-11-aarch64-linux-gnu
 ./build.py conan-install -o .conan-armv8 -pr:h profiles/linux.release.armv8
 ./build.py configure -t .conan-armv8/build/Release/generators/conan_toolchain.cmake -b .build-armv8 -bt Release
 ./build.py build -b .build-armv8
 ```
 
-*ubuntu-20.04, gcc-9*
+*ubuntu-22.04, gcc-11*
 
 ## Windows
 
-### Debug Configuration
+### Generate Visual Studio Project
 
 ```bat
-python.exe build.py conan-install -pr:h profiles/windows.debug.x86_64
-python.exe build.py configure -bt Debug
-python.exe build.py build -bt Debug
+python.exe build.py conan-install -pr:h profiles/windows.release.x86_64
+cmake -G "Visual Studio 17 2022" -B Builds -DCMAKE_TOOLCHAIN_FILE=".conan-install/build/generators/conan_toolchain.cmake"
 ```
 
 ### VS Code Debugger Configuration
