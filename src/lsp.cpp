@@ -211,6 +211,11 @@ void LSPServerEventsHandler::OnInitialize(const json &data)
         auto buildOptions = GetNestedValue(*configuration, {"buildOptions"});
         auto maxNumberOfProblems = GetNestedValue(*configuration, {"maxNumberOfProblems"});
         auto deviceID = GetNestedValue(*configuration, {"deviceID"});
+        if (deviceID)
+        {
+            m_diagnostics->SetOpenCLDevice(*deviceID);
+            ConfigureCompletion();
+        }
         if (buildOptions)
         {
             m_diagnostics->SetBuildOptions(*buildOptions);
@@ -218,11 +223,6 @@ void LSPServerEventsHandler::OnInitialize(const json &data)
         if (maxNumberOfProblems)
         {
             m_diagnostics->SetMaxProblemsCount(*maxNumberOfProblems);
-        }
-        if (deviceID)
-        {
-            m_diagnostics->SetOpenCLDevice(*deviceID);
-            ConfigureCompletion();
         }
     }
 
@@ -454,6 +454,13 @@ void LSPServerEventsHandler::OnConfiguration(const json &data)
             logger()->warn("Unexpected number of options");
             return;
         }
+        
+        if (result[DeviceID].is_number_integer())
+        {
+            auto deviceID = result[DeviceID].get<int64_t>();
+            m_diagnostics->SetOpenCLDevice(static_cast<uint32_t>(deviceID));
+            ConfigureCompletion();
+        }
 
         if (result[BuildOptions].is_array())
         {
@@ -465,13 +472,6 @@ void LSPServerEventsHandler::OnConfiguration(const json &data)
         {
             auto maxProblemsCount = result[MaxProblemsCount].get<int64_t>();
             m_diagnostics->SetMaxProblemsCount(static_cast<int>(maxProblemsCount));
-        }
-
-        if (result[DeviceID].is_number_integer())
-        {
-            auto deviceID = result[DeviceID].get<int64_t>();
-            m_diagnostics->SetOpenCLDevice(static_cast<uint32_t>(deviceID));
-            ConfigureCompletion();
         }
     }
     catch (std::exception &err)
