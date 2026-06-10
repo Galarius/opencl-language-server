@@ -128,7 +128,7 @@ private:
     std::shared_ptr<ICLInfo> m_clInfo;
     std::shared_ptr<IDiagnosticsParser> m_parser;
     std::optional<ocls::Device> m_device;
-    std::string m_BuildOptions;
+    std::string m_buildOptions;
     uint64_t m_maxNumberOfProblems = INT8_MAX;
 };
 
@@ -157,8 +157,8 @@ void Diagnostics::SetBuildOptions(const json& options)
 
 void Diagnostics::SetBuildOptions(const std::string& options)
 {
-    m_BuildOptions = options;
-    logger()->trace("Set build options: {}", m_BuildOptions);
+    m_buildOptions = options;
+    logger()->trace("Set build options: {}", m_buildOptions);
 }
 
 void Diagnostics::SetMaxProblemsCount(uint64_t maxNumberOfProblems)
@@ -173,7 +173,7 @@ void Diagnostics::SetOpenCLDevice(uint32_t identifier)
 
     const auto devices = m_clInfo->GetDevices();
 
-    if (devices.size() == 0)
+    if (devices.empty())
     {
         return;
     }
@@ -208,8 +208,7 @@ nlohmann::json Diagnostics::GetDiagnostics(const Source& source)
     std::string srcName;
     if (!source.filePath.empty())
     {
-        auto filePath = std::filesystem::path(source.filePath).string();
-        srcName = std::filesystem::path(filePath).filename().string();
+        srcName = std::filesystem::path(source.filePath).filename().string();
     }
     std::string buildLog = GetBuildLog(source);
     logger()->trace("BuildLog:\n{}", buildLog);
@@ -274,20 +273,20 @@ std::string Diagnostics::BuildSource(const std::string& source) const
     }
 
     std::vector<cl::Device> ds {(*m_device).getUnderlyingDevice()};
-    cl::Context context(ds, NULL, NULL, NULL);
+    cl::Context context(ds, nullptr, nullptr, nullptr);
     cl::Program program;
     try
     {
-        if (m_BuildOptions.empty())
+        if (m_buildOptions.empty())
         {
             logger()->trace("Building program...");
         }
         else
         {
-            logger()->trace("Building program with options: {}...", m_BuildOptions);
+            logger()->trace("Building program with options: {}...", m_buildOptions);
         }
         program = cl::Program(context, source, false);
-        program.build(ds, m_BuildOptions.c_str());
+        program.build(ds, m_buildOptions.c_str());
     }
     catch (cl::Error& err)
     {
