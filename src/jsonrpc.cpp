@@ -270,7 +270,6 @@ void JsonRPC::OnInitialize()
         const auto traceValue = m_body["params"]["trace"].get<std::string>();
         m_tracing = traceValue != "off";
         m_verbosity = traceValue == "verbose";
-        m_initialized = true;
         logger()->trace("Tracing options: is verbose: {}, is on: {}",
                         utils::FormatBool(m_verbosity),
                         utils::FormatBool(m_tracing));
@@ -279,6 +278,7 @@ void JsonRPC::OnInitialize()
     {
         logger()->error("Failed to read tracing options, {}", err.what());
     }
+    m_initialized = true;
 }
 
 void JsonRPC::OnTracingChanged(const json& data)
