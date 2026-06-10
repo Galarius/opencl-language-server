@@ -33,29 +33,34 @@ namespace ocls {
 
 class DiagnosticsParser final : public IDiagnosticsParser
 {
-    std::regex m_regex {"^(.*):(\\d+):(\\d+): ((fatal )?error|warning|Scholar): (.*)$"};
+    std::regex m_regex {"^(.*):(\\d+):(\\d+): ((fatal )?error|warning|note): (.*)$"};
 
 public:
-    int ParseSeverity(const std::string& severity)
+    DiagnosticSeverity ParseSeverity(const std::string& severity)
     {
         if (severity == "warning")
         {
-            return 2;
+            return DiagnosticSeverity::warning;
         }
         else if (utils::EndsWith(severity, "error"))
         {
-            return 1;
+            return DiagnosticSeverity::error;
         }
-        return -1;
+        else if(severity == "note")
+        {
+            return DiagnosticSeverity::information;
+        }
+        
+        return DiagnosticSeverity::hint;
     }
 
     // example input: <program source>:13:5: warning: no previous prototype for function 'getChannel'
-    std::tuple<std::string, long, long, long, std::string> ParseMatch(const std::smatch& matches)
+    std::tuple<std::string, long, long, DiagnosticSeverity, std::string> ParseMatch(const std::smatch& matches)
     {
         std::string source = matches[1];
-        const long line = std::stoi(matches[2]) - 1; // LSP assumes 0-indexed lines
-        const long col = std::stoi(matches[3]);
-        const int severity = ParseSeverity(matches[4]);
+        const long line = std::stol(matches[2]) - 1; // LSP assumes 0-indexed lines
+        const long col = std::stol(matches[3]) - 1;  // LSP assumes 0-indexed columns
+        const DiagnosticSeverity severity = ParseSeverity(matches[4]);
         // matches[5] - 'fatal '
         std::string message = matches[6];
         return std::make_tuple(std::move(source), line, col, severity, std::move(message));
@@ -87,7 +92,12 @@ public:
                     logger()->warn("Maximum number of problems reached, other problems will be skipped");
                     break;
                 }
-                diagnostics.emplace_back(CreateDiagnostic(matches, name));
+                try {
+                    diagnostics.emplace_back(CreateDiagnostic(matches, name));
+                } catch (std::exception& e) {
+                    logger()->error("Failed to create diagnostic message for '{}': {}", name, e.what());
+                }
+                
             }
         }
         return diagnostics;
