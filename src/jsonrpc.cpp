@@ -333,7 +333,7 @@ void JsonRPC::FireMethodCallback()
     auto callback = m_callbacks.find(m_method);
     if (callback == m_callbacks.end())
     {
-        const bool isRequest = m_body["params"]["id"] != nullptr;
+        const bool isRequest = m_body["id"] != nullptr;
         const bool mustRespond = isRequest || m_method.rfind("$/", 0) == std::string::npos;
         logger()->trace("Got request: {}, respond is required: {}",
                         utils::FormatBool(isRequest),
