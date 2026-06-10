@@ -496,12 +496,12 @@ void LSPServerEventsHandler::OnRespond(const json &data)
         if (id == request.second && "workspace/configuration" == request.first)
         {
             OnConfiguration(data);
+            m_requests.pop();
         }
         else
         {
             logger()->warn("Out of order respond");
         }
-        m_requests.pop();
     }
     catch (std::exception &err)
     {
