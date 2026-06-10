@@ -261,7 +261,6 @@ struct CompletionSubCommand final : public SubCommand
                     {
                         tagsStr.pop_back();
                         tagsStr.pop_back();
-                        tagsStr.pop_back();
                     }
                     tagsStr += "]";
 
