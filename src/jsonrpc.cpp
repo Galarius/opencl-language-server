@@ -405,7 +405,7 @@ void JsonRPC::LogMessage(const std::string& message) const
 
 void JsonRPC::LogAndHandleParseError(std::exception& e)
 {
-    logger()->error("Failed to parse request with reason: '{}'\n{}", e.what(), "\n", m_buffer);
+    logger()->error("Failed to parse request with reason: '{}'; {}", e.what(), m_buffer);
     m_buffer.clear();
     WriteError(JRPCErrorCode::ParseError, "Failed to parse request");
 }
