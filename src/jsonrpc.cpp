@@ -310,7 +310,7 @@ bool JsonRPC::ReadHeader()
         std::string value = match.str(2);
         if (key == "Content-Length")
         {
-            m_contentLength = std::stoi(value);
+            m_contentLength = std::stoul(value);
         }
         m_headers[key] = value;
         ++next;
