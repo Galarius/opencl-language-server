@@ -15,13 +15,13 @@ using namespace ocls;
 using namespace nlohmann;
 
 class DiagnosticsParserRegexTest
-    : public ::testing::TestWithParam<std::tuple<std::string, std::string, long, long, long, std::string>>
+    : public ::testing::TestWithParam<std::tuple<std::string, std::string, long, long, DiagnosticSeverity, std::string>>
 {};
 
 TEST_P(DiagnosticsParserRegexTest, CheckRegexParsing)
 {
     auto [input, expectedSource, expectedLine, expectedCol, expectedSeverity, expectedMessage] = GetParam();
-    std::regex r("^(.*):(\\d+):(\\d+): ((fatal )?error|warning|Scholar): (.*)$");
+    std::regex r("^(.*):(\\d+):(\\d+): ((fatal )?error|warning|note): (.*)$");
     std::smatch match;
     EXPECT_TRUE(std::regex_search(input, match, r));
 
@@ -43,29 +43,29 @@ INSTANTIATE_TEST_SUITE_P(
             "<program source>:12:5: warning: no previous prototype for function 'getChannel'",
             "<program source>",
             11,
-            5,
-            2,
+            4,
+            DiagnosticSeverity::warning,
             "no previous prototype for function 'getChannel'"),
         std::make_tuple(
             "<program source>:16:27: error: use of undeclared identifier 'r'",
             "<program source>",
             15,
-            27,
-            1,
+            26,
+            DiagnosticSeverity::error,
             "use of undeclared identifier 'r'"),
         std::make_tuple(
             "<custom source>:100:2: fatal error: unexpected end of file",
             "<custom source>",
             99,
-            2,
             1,
+            DiagnosticSeverity::error,
             "unexpected end of file"),
         std::make_tuple(
-            "<sample source>:5:14: Scholar: reference missing for citation",
+            "<sample source>:5:14: note: reference missing for citation",
             "<sample source>",
             4,
-            14,
-            -1,
+            13,
+            DiagnosticSeverity::information,
             "reference missing for citation")));
 
 TEST(ParseDiagnosticsTest, NoDiagnosticMessages)
@@ -85,11 +85,11 @@ TEST(ParseDiagnosticsTest, SingleDiagnosticMessage)
             "range": {
                 "start": {
                     "line": 11,
-                    "character": 5
+                    "character": 4
                 },
                 "end": {
                     "line": 11,
-                    "character": 5
+                    "character": 4
                 }
             },
             "severity": 2,
@@ -111,11 +111,11 @@ TEST(ParseDiagnosticsTest, MultipleDiagnosticMessages)
             "range": {
                 "start": {
                     "line": 11,
-                    "character": 5
+                    "character": 4
                 },
                 "end": {
                     "line": 11,
-                    "character": 5
+                    "character": 4
                 }
             },
             "severity": 2,
@@ -126,11 +126,11 @@ TEST(ParseDiagnosticsTest, MultipleDiagnosticMessages)
             "range": {
                 "start": {
                     "line": 15,
-                    "character": 27
+                    "character": 26
                 },
                 "end": {
                     "line": 15,
-                    "character": 27
+                    "character": 26
                 }
             },
             "severity": 1,
@@ -153,11 +153,11 @@ TEST(ParseDiagnosticsTest, ExceedProblemsLimit)
             "range": {
                 "start": {
                     "line": 11,
-                    "character": 5
+                    "character": 4
                 },
                 "end": {
                     "line": 11,
-                    "character": 5
+                    "character": 4
                 }
             },
             "severity": 2,
@@ -168,11 +168,11 @@ TEST(ParseDiagnosticsTest, ExceedProblemsLimit)
             "range": {
                 "start": {
                     "line": 15,
-                    "character": 27
+                    "character": 26
                 },
                 "end": {
                     "line": 15,
-                    "character": 27
+                    "character": 26
                 }
             },
             "severity": 1,

@@ -18,6 +18,13 @@
 
 namespace ocls {
 
+enum class DiagnosticSeverity: unsigned {
+    error = 1,
+    warning = 2,
+    information = 3,
+    hint = 4
+};
+
 struct Source
 {
     std::string filePath;
@@ -33,7 +40,7 @@ struct IDiagnosticsParser
 {
     virtual ~IDiagnosticsParser() = default;
 
-    virtual std::tuple<std::string, long, long, long, std::string> ParseMatch(const std::smatch& matches) = 0;
+    virtual std::tuple<std::string, long, long, DiagnosticSeverity, std::string> ParseMatch(const std::smatch& matches) = 0;
     virtual nlohmann::json ParseDiagnostics(
         const std::string& buildLog, const std::string& name, uint64_t problemsLimit) = 0;
 };
