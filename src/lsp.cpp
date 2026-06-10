@@ -23,7 +23,7 @@ namespace {
 constexpr int BuildOptions = 0;
 constexpr int MaxProblemsCount = 1;
 constexpr int DeviceID = 2;
-constexpr int NumConfigurations = 2;
+constexpr int NumConfigurations = 3;
 
 std::optional<nlohmann::json> GetNestedValue(const nlohmann::json &j, const std::vector<std::string> &keys)
 {
