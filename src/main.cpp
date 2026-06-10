@@ -108,14 +108,14 @@ struct DiagnosticsSubCommand final : public SubCommand
 
         try
         {
-            if (!buildOptions.empty())
-            {
-                diagnostics->SetBuildOptions(buildOptions);
-            }
-
             if (deviceID > 0)
             {
                 diagnostics->SetOpenCLDevice(deviceID);
+            }
+
+            if (!buildOptions.empty())
+            {
+                diagnostics->SetBuildOptions(buildOptions);
             }
 
             if (maxNumberOfProblems != INT8_MAX)
@@ -364,8 +364,8 @@ int main(int argc, char* argv[])
         ConfigureNullLogging();
     }
     
-    spdlog::get(LogName::main)->info("OpenCL Language Server {}", ocls::version);
-    spdlog::get(LogName::main)->info("{}", GetClangVersion());
+    logger()->info("OpenCL Language Server {}", ocls::version);
+    logger()->info("{}", GetClangVersion());
 
     auto clinfo = CreateCLInfo();
 
@@ -405,7 +405,7 @@ int main(int argc, char* argv[])
         result = server->Run();
     } while (false);
 
-    spdlog::get(LogName::main)->info("Shutting down...\n\n");
+    logger()->info("Shutting down...\n\n");
     spdlog::shutdown();
     return result;
 }

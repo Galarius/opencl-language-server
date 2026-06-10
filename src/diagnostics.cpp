@@ -25,6 +25,8 @@ auto logger()
     return spdlog::get(ocls::LogName::diagnostics);
 }
 
+constexpr char clstdBuildOption[] = "-cl-std";
+
 } // namespace
 
 namespace ocls {
@@ -137,6 +139,8 @@ Diagnostics::Diagnostics(std::shared_ptr<ICLInfo> clInfo, std::shared_ptr<IDiagn
     , m_parser {std::move(parser)}
 {
     SetOpenCLDevice(0);
+    SetBuildOptions(std::string());
+    logger()->trace("Initialized");
 }
 
 // - IDiagnostics
@@ -157,8 +161,17 @@ void Diagnostics::SetBuildOptions(const json& options)
 
 void Diagnostics::SetBuildOptions(const std::string& options)
 {
+    logger()->trace("Set build options: {}", options);
     m_buildOptions = options;
-    logger()->trace("Set build options: {}", m_buildOptions);
+    if (m_buildOptions.empty() || m_buildOptions.find(clstdBuildOption) == std::string::npos)
+    {
+        auto clstd = m_device->GetCLStandard();
+        logger()->trace("Adding build option {}={}", clstdBuildOption, clstd);
+        if(!m_buildOptions.empty()) {
+            m_buildOptions.append(" ");
+        }
+        m_buildOptions.append(std::string(clstdBuildOption) + "=" + clstd);
+    }
 }
 
 void Diagnostics::SetMaxProblemsCount(uint64_t maxNumberOfProblems)
@@ -277,14 +290,7 @@ std::string Diagnostics::BuildSource(const std::string& source) const
     cl::Program program;
     try
     {
-        if (m_buildOptions.empty())
-        {
-            logger()->trace("Building program...");
-        }
-        else
-        {
-            logger()->trace("Building program with options: {}...", m_buildOptions);
-        }
+        logger()->debug("Building program with options: {}", m_buildOptions);
         program = cl::Program(context, source, false);
         program.build(ds, m_buildOptions.c_str());
     }
