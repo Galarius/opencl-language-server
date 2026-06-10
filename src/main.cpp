@@ -286,7 +286,6 @@ private:
     std::string kernel;
     uint32_t line = 0;
     uint32_t column = 0;
-    std::string openclHeaderPath;
     std::string clVersion;
     bool json = false;
 };
