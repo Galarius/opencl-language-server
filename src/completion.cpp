@@ -721,7 +721,7 @@ std::vector<CompletionResult> Completion::GetCompletions(
         return {};
     }
 
-    unsigned completionColumn;
+    unsigned completionColumn = columnno;
     auto prefix = GetPrefix(translationUnit, filePath, lineno, columnno, completionColumn);
     if (!prefix)
     {
