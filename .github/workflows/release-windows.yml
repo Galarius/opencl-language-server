@@ -1,0 +1,87 @@
+name: Release (Windows)
+
+on:
+  workflow_call:
+    inputs:
+      python-version:
+        type: string
+        default: '3.13'
+
+env:
+  BUILD_TYPE: Release
+
+jobs:
+  build:
+    name: Build Release (Windows)
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      matrix:
+        os: [windows-2022, windows-11-arm]
+
+    env:
+      CONAN_HOME: ${{ github.workspace }}/.conan-home
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ inputs.python-version }}
+
+      - name: Create virtual environment
+        run: python3 -m venv .pyenv
+
+      - name: Activate virtual environment
+        run: .pyenv\Scripts\activate.bat
+
+      - name: Setup environment
+        run: |
+          pip3 install wheel
+          pip3 install -r requirements.txt
+          conan profile detect
+
+      - name: Cache libclang
+        uses: actions/cache@v5
+        env:
+          cache-name: cache-libclang
+        with:
+          path: .libclang-cache/download/*.7z
+          key: ${{ runner.os }}-${{ runner.arch }}-build-${{ env.cache-name }}-${{ hashFiles('libclang/libclang-urls.txt') }}
+
+      - name: Configure & Build
+        run: |
+          python3 build.py conan-install
+          python3 build.py configure
+          python3 build.py build
+
+      - name: Archive artifact (x86_64)
+        if: "!contains(matrix.os, 'arm')"
+        run: |
+          cd ${{github.workspace}}/.build/Release
+          7z a -tzip opencl-language-server-win32-x86_64.zip opencl-language-server.exe
+
+      - name: Archive artifact (arm64)
+        if: "contains(matrix.os, 'arm')"
+        run: |
+          cd ${{github.workspace}}/.build/Release
+          7z a -tzip opencl-language-server-win32-arm64.zip opencl-language-server.exe
+
+      - name: Upload artifact (x86_64)
+        if: "!contains(matrix.os, 'arm')"
+        uses: actions/upload-artifact@v7
+        with:
+          name: opencl-language-server-win32-x86_64.zip
+          path: ${{github.workspace}}/.build/Release/opencl-language-server-win32-x86_64.zip
+          retention-days: 1
+          archive: false
+
+      - name: Upload artifact (arm64)
+        if: "contains(matrix.os, 'arm')"
+        uses: actions/upload-artifact@v7
+        with:
+          name: opencl-language-server-win32-arm64.zip
+          path: ${{github.workspace}}/.build/Release/opencl-language-server-win32-arm64.zip
+          retention-days: 1
+          archive: false
