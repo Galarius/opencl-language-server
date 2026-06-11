@@ -1,0 +1,81 @@
+name: Build (Linux)
+
+on:
+  workflow_call:
+    inputs:
+      python-version:
+        type: string
+        default: '3.13'
+
+env:
+  BUILD_TYPE: Release
+
+jobs:
+  build:
+    name: Build Release (Linux)
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      matrix:
+        os: [ubuntu-22.04, ubuntu-24.04-arm]
+
+    env:
+      CONAN_HOME: ${{ github.workspace }}/.conan-home
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install prerequisites (arm64)
+        if: "contains(matrix.os, 'arm')"
+        run: |
+          sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
+          sudo apt update
+          sudo apt install -y gcc-11 g++-11
+          ls /usr/bin/ | grep aarch64
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ inputs.python-version }}
+
+      - name: Create virtual environment
+        run: python3 -m venv .pyenv
+
+      - name: Activate virtual environment
+        run: source .pyenv/bin/activate
+
+      - name: Setup environment
+        run: |
+          pip3 install wheel
+          pip3 install -r requirements.txt
+          conan profile detect
+
+      - name: Conan Install
+        run: |
+          python3 build.py conan-install --with-tests
+
+      - name: Cache libclang
+        uses: actions/cache@v5
+        env:
+          cache-name: cache-libclang
+        with:
+          path: .libclang-cache/download/*.7z
+          key: ${{ runner.os }}-${{ runner.arch }}-build-${{ env.cache-name }}-${{ hashFiles('libclang/libclang-urls.txt') }}
+
+      - name: Configure
+        run: |
+          python3 build.py configure --with-tests
+
+      - name: Build
+        run: |
+          python3 build.py build
+
+      - name: Test
+        run: |
+          cd .build
+          ctest --verbose --output-on-failure
+      
+      - name: Run
+        run: |
+          .build/opencl-language-server clinfo -p
+          .build/opencl-language-server completion -k tests/fixtures/kernel.cl --cl-std cl1.2 --line 58 --column 20 --json

@@ -14,87 +14,20 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
+  windows:
+    name: Windows
+    uses: ./.github/workflows/build-windows.yml
+    with:
+      python-version: '3.13'
 
-    runs-on: ${{ matrix.os }}
+  linux:
+    name: Linux
+    uses: ./.github/workflows/build-linux.yml
+    with:
+      python-version: '3.13'
 
-    strategy:
-      matrix:
-        os: [macos-latest, ubuntu-22.04, ubuntu-24.04-arm, windows-2022, windows-11-arm]
-        python-version: [3.13]
-    
-    env:
-      CONAN_HOME: ${{ github.workspace }}/.conan-home
-
-    steps:
-    - uses: actions/checkout@v5
-
-    - name: Linux - Install prerequisites (arm64)
-      if: runner.os == 'Linux' && runner.arch == 'ARM64'
-      run: |
-        sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
-        sudo apt update
-        sudo apt install -y gcc-11 g++-11
-        ls /usr/bin/ | grep aarch64
-
-    - name: Set up Python
-      uses: actions/setup-python@v6
-      with:
-        python-version: ${{ matrix.python-version }}
-
-    - name: Create virtual environment
-      run: python3 -m venv .pyenv
-
-    - name: Windows - Activate virtual environment
-      if: runner.os == 'Windows'
-      run: .pyenv\Scripts\activate.bat
-
-    - name: Unix - Activate virtual environment
-      if: runner.os != 'Windows'
-      run: source .pyenv/bin/activate
-
-    - name: Setup environment
-      run: |
-        pip3 install wheel
-        pip3 install -r requirements.txt
-        conan profile detect
-
-    - name: Conan Install
-      run: |
-        python3 build.py conan-install --with-tests
-    
-    - name: Set arch name
-      shell: bash
-      run: |
-        if [ "${{ runner.os }}" = "macOS" ]; then
-          echo "ARCH_NAME=universal" >> $GITHUB_ENV
-        else
-          echo "ARCH_NAME=${{ runner.arch }}" >> $GITHUB_ENV
-        fi
-
-    - name: Cache libclang 
-      id: cache-libclang
-      uses: actions/cache@v5
-      env:
-        cache-name: cache-libclang
-      with:
-        path: .libclang-cache/download/*.7z
-        key: ${{ runner.os }}-${{ env.ARCH_NAME }}-build-${{ env.cache-name }}-${{ hashFiles('libclang/libclang-urls.txt') }}
-
-    - name: Configure
-      run: |
-        python3 build.py configure --with-tests
-
-    - name: Build
-      run: |
-        python3 build.py build
-
-    - name: Test
-      run: |
-        cd ${{github.workspace}}/.build
-        ctest --verbose --output-on-failure
-
-    - name: Run (Windows)
-      if: runner.os == 'Windows'
-      run: |
-        ${{github.workspace}}\.build\Release\opencl-language-server.exe clinfo -p
+  macos:
+    name: macOS
+    uses: ./.github/workflows/build-macos.yml
+    with:
+      python-version: '3.13'
