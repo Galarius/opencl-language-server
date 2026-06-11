@@ -1,0 +1,91 @@
+name: Sign and Notarize
+description: >
+  Codesigns a macOS binary, wraps it in a zip archive, submits
+  the archive to Apple Notary Service, and exposes the archive path
+  as an output so the caller can upload it as an artifact.
+
+inputs:
+  binary-path:
+    description: >
+      Path to the compiled binary to sign, relative to the
+      workspace root (e.g. `.build/opencl-language-server`).
+    required: true
+  entitlements-path:
+    description: >
+      Path to the .entitlements file relative to the workspace root
+      (e.g. `build-support/opencl-language-server.entitlements`).
+    required: true
+  signing-identity:
+    description: >
+      Code-signing identity string, typically the certificate's
+      Common Name (secret).
+    required: true
+  keychain-profile:
+    description: >
+      Name of the keychain profile that holds the notarytool
+      credentials; must match the profile created by
+      `setup-apple-signing` (variable).
+    required: true
+  archive-name:
+    description: >
+      Base name (without extension) for the output .zip archive.
+      Defaults to the filename of `binary-path`.
+    required: false
+    default: ''
+
+outputs:
+  archive-path:
+    description: Absolute path to the notarized .zip archive.
+    value: ${{ steps.archive.outputs.archive-path }}
+
+runs:
+  using: composite
+  steps:
+    - name: Sign binary
+      shell: bash
+      env:
+        SIGNING_IDENTITY: ${{ inputs.signing-identity }}
+        BINARY_PATH: ${{ inputs.binary-path }}
+        ENTITLEMENTS_PATH: ${{ inputs.entitlements-path }}
+      run: |
+        codesign \
+          -s "$SIGNING_IDENTITY" \
+          --timestamp \
+          --force \
+          --options runtime \
+          --entitlements "$ENTITLEMENTS_PATH" \
+          "$BINARY_PATH"
+
+        # Verify the signature
+        codesign --verify -vvvv "$BINARY_PATH"
+        codesign -vvvv -d --entitlements - "$BINARY_PATH"
+
+    - name: Archive binary
+      id: archive
+      shell: bash
+      env:
+        BINARY_PATH: ${{ inputs.binary-path }}
+        ARCHIVE_NAME: ${{ inputs.archive-name }}
+      run: |
+        BINARY_FILENAME="$(basename "$BINARY_PATH")"
+        BINARY_DIR="$(dirname "$BINARY_PATH")"
+
+        # Use caller-supplied name, or fall back to the binary filename
+        OUTPUT_NAME="${ARCHIVE_NAME:-$BINARY_FILENAME}"
+        ARCHIVE_PATH="$BINARY_DIR/${OUTPUT_NAME}.zip"
+
+        cd "$BINARY_DIR"
+        zip "${OUTPUT_NAME}.zip" "$BINARY_FILENAME"
+
+        echo "archive-path=$ARCHIVE_PATH" >> "$GITHUB_OUTPUT"
+
+    - name: Notarize archive
+      shell: bash
+      env:
+        KEYCHAIN_PROFILE: ${{ inputs.keychain-profile }}
+        ARCHIVE_PATH: ${{ steps.archive.outputs.archive-path }}
+      run: |
+        xcrun notarytool submit \
+          --wait \
+          --keychain-profile "$KEYCHAIN_PROFILE" \
+          "$ARCHIVE_PATH"
