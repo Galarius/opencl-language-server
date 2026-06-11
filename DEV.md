@@ -77,7 +77,7 @@ cmake -G Xcode -DCMAKE_TOOLCHAIN_FILE=".conan-install/build/Debug/generators/con
 ### Signing
 
 ```shell
-codesign -s ${DEVELOPER_ID} --timestamp --force --options runtime .build-universal/opencl-language-server
+codesign -s ${DEVELOPER_ID} --timestamp --force --options runtime --entitlements build-support/opencl-language-server.entitlements .build-universal/opencl-language-server
 codesign --verify -vvvv .build-universal/opencl-language-server
 ```
 

@@ -1,0 +1,77 @@
+name: Setup Apple Signing
+description: >
+  Imports a P12 certificate into a temporary keychain and stores
+  notarytool credentials. Call the companion `sign-and-notarize`
+  action afterwards, then rely on the `cleanup-apple-signing` post
+  step (or call it explicitly in an `if: always()` step) to remove
+  the keychain.
+
+inputs:
+  build-certificate-base64:
+    description: Base64-encoded P12 certificate (secret).
+    required: true
+  p12-password:
+    description: Password for the P12 certificate (secret).
+    required: true
+  keychain-password:
+    description: Password used to create the temporary keychain (secret).
+    required: true
+  apple-id:
+    description: Apple ID used for notarytool authentication (secret).
+    required: true
+  team-id:
+    description: Apple Developer Team ID (secret).
+    required: true
+  notarytool-password:
+    description: App-specific password for notarytool (secret).
+    required: true
+  keychain-profile:
+    description: >
+      Name of the keychain profile that stores the notarytool
+      credentials (variable).
+    required: true
+
+outputs:
+  keychain-path:
+    description: Path to the temporary keychain file.
+    value: ${{ steps.setup.outputs.keychain-path }}
+
+runs:
+  using: composite
+  steps:
+    - name: Import certificate and store notarytool credentials
+      id: setup
+      shell: bash
+      env:
+        BUILD_CERTIFICATE_BASE64: ${{ inputs.build-certificate-base64 }}
+        P12_PASSWORD: ${{ inputs.p12-password }}
+        KEYCHAIN_PASSWORD: ${{ inputs.keychain-password }}
+        APPLE_ID: ${{ inputs.apple-id }}
+        TEAM_ID: ${{ inputs.team-id }}
+        NOTARYTOOL_PASSWORD: ${{ inputs.notarytool-password }}
+        KEYCHAIN_PROFILE: ${{ inputs.keychain-profile }}
+      run: |
+        CERTIFICATE_PATH=$RUNNER_TEMP/build_certificate.p12
+        KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
+
+        # Decode and write the certificate
+        echo -n "$BUILD_CERTIFICATE_BASE64" | base64 --decode -o "$CERTIFICATE_PATH"
+
+        # Create a temporary keychain
+        security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+        security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+        security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+        security default-keychain -s "$KEYCHAIN_PATH"
+
+        # Import the certificate
+        security import "$CERTIFICATE_PATH" \
+          -P "$P12_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
+        security list-keychain -d user -s "$KEYCHAIN_PATH"
+
+        # Store notarytool credentials in the keychain profile
+        xcrun notarytool store-credentials "$KEYCHAIN_PROFILE" \
+          --apple-id "$APPLE_ID" \
+          --team-id "$TEAM_ID" \
+          --password "$NOTARYTOOL_PASSWORD"
+
+        echo "keychain-path=$KEYCHAIN_PATH" >> "$GITHUB_OUTPUT"

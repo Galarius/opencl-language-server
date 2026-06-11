@@ -1,0 +1,26 @@
+name: Cleanup Apple Signing
+description: >
+  Deletes the temporary keychain created by `setup-apple-signing`.
+  Always run this in an `if: always()` step so the keychain is
+  removed even when earlier steps fail.
+
+inputs:
+  keychain-path:
+    description: >
+      Path to the keychain file to delete. Use the `keychain-path`
+      output from the `setup-apple-signing` action.
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Delete temporary keychain
+      shell: bash
+      env:
+        KEYCHAIN_PATH: ${{ inputs.keychain-path }}
+      run: |
+        if security list-keychains | grep -qF "$KEYCHAIN_PATH"; then
+          security delete-keychain "$KEYCHAIN_PATH"
+        else
+          echo "Keychain not found, nothing to clean up: $KEYCHAIN_PATH"
+        fi
