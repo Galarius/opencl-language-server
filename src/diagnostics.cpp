@@ -165,12 +165,15 @@ void Diagnostics::SetBuildOptions(const std::string& options)
     m_buildOptions = options;
     if (m_buildOptions.empty() || m_buildOptions.find(clstdBuildOption) == std::string::npos)
     {
-        auto clstd = m_device->GetCLStandard();
-        logger()->trace("Adding build option {}={}", clstdBuildOption, clstd);
-        if(!m_buildOptions.empty()) {
-            m_buildOptions.append(" ");
+        if (m_device.has_value())
+        {
+            auto clstd = m_device->GetCLStandard();
+            logger()->trace("Adding build option {}={}", clstdBuildOption, clstd);
+            if(!m_buildOptions.empty()) {
+                m_buildOptions.append(" ");
+            }
+            m_buildOptions.append(std::string(clstdBuildOption) + "=" + clstd);
         }
-        m_buildOptions.append(std::string(clstdBuildOption) + "=" + clstd);
     }
 }
 
