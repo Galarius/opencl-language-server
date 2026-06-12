@@ -294,7 +294,10 @@ std::string Diagnostics::BuildSource(const std::string& source) const
     try
     {
         logger()->debug("Building program with options: {}", m_buildOptions);
-        program = cl::Program(context, source, false);
+        // #line 1 resets the compiler's line counter to 1, so any runtime
+        // preamble injected before this point is invisible to error reporting
+        std::string patchedSource = "#line 1\n" + source;
+        program = cl::Program(context, patchedSource, false);
         program.build(ds, m_buildOptions.c_str());
     }
     catch (cl::Error& err)
