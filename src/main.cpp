@@ -396,7 +396,7 @@ int main(int argc, char* argv[])
         auto jrpc = CreateJsonRPC();
 
         auto device = diagnostics->GetDevice();
-        auto clStandard = device->GetCLStandard();
+        auto clStandard = device ? device->GetCLStandard() : "CL";
         auto options = BuildDefaultTranslationOptions(clStandard);
         auto completion = CreateCompletion();
         completion->SaveHeaders();

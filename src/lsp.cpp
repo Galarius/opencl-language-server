@@ -177,7 +177,7 @@ void LSPServerEventsHandler::ConfigureCompletion()
 {
     logger()->trace("LSPServerEventsHandler::ConfigureCompletion");
     auto device = m_diagnostics->GetDevice();
-    auto clStandard = device->GetCLStandard();
+    auto clStandard = device ? device->GetCLStandard() : "CL";
     auto options = BuildDefaultTranslationOptions(clStandard);
     m_completion->SetTranslationOptions(options);
 }
