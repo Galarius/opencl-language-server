@@ -78,6 +78,7 @@ set(headers
     translation.hpp
     completion.hpp
     definition.hpp
+    typedef.hpp
     location.hpp
     jsonrpc.hpp
     log.hpp
@@ -90,6 +91,7 @@ set(sources
     translation.cpp
     completion.cpp
     definition.cpp
+    typedef.cpp
     location.cpp
     jsonrpc.cpp
     log.cpp
