@@ -24,25 +24,26 @@ namespace {
 
 const std::string TEST_FIXTURE_DIR = fs::path(__FILE__).parent_path().string() + "/fixtures";
 const std::string KERNEL_FILE = TEST_FIXTURE_DIR + "/kernel.cl";
+// Line 62: "            p = get"
+// Position 20 is after "get" to trigger completion for getChannel
+const unsigned line = 62;
+const unsigned column = 20;
 
 class CompletionTest : public ::testing::Test
 {
 protected:
     std::shared_ptr<ICompletion> completion;
     std::shared_ptr<ITranslationUnitStore> store;
-    std::string fileContent;
-    CXTranslationUnit dummyTU{nullptr};
-    CXCursor dummyCursor{};
 
     void SetUp() override
     {
+        std::string fileContent;
         std::ifstream f(KERNEL_FILE);
         if (f.is_open())
         {
             fileContent.assign(std::istreambuf_iterator<char>(f), std::istreambuf_iterator<char>());
         }
         store = CreateTranslationUnitStore();
-        store->SetTranslationOptions({});
         store->SetTranslationOptions({});
         store->OnFileOpen(KERNEL_FILE, fileContent);
         completion = CreateCompletion(store);
@@ -59,9 +60,7 @@ protected:
 // Test basic completion at a function call site
 TEST_F(CompletionTest, CompletionAtFunctionCall)
 {
-    // Line 58: "            p = get"
-    // Position 20 is after "get" to trigger completion for getChannel
-    auto results = completion->GetCompletions(KERNEL_FILE, 58, 20);
+    auto results = completion->GetCompletions(KERNEL_FILE, line, column);
 
     ASSERT_GT(results.size(), 0);
 
@@ -80,7 +79,7 @@ TEST_F(CompletionTest, CompletionAtFunctionCall)
 // Test that results include proper sort order
 TEST_F(CompletionTest, CompletionSortOrder)
 {
-    auto results = completion->GetCompletions(KERNEL_FILE, 58, 20);
+    auto results = completion->GetCompletions(KERNEL_FILE, line, column);
 
     ASSERT_GT(results.size(), 0);
 
@@ -96,7 +95,7 @@ TEST_F(CompletionTest, CompletionSortOrder)
 // Test completion item kinds are properly mapped
 TEST_F(CompletionTest, CompletionItemKinds)
 {
-    auto results = completion->GetCompletions(KERNEL_FILE, 58, 20);
+    auto results = completion->GetCompletions(KERNEL_FILE, line, column);
 
     ASSERT_GT(results.size(), 0);
 
@@ -117,7 +116,7 @@ TEST_F(CompletionTest, CompletionItemKinds)
 // Test that function completions have commit characters
 TEST_F(CompletionTest, FunctionCommitCharacters)
 {
-    auto results = completion->GetCompletions(KERNEL_FILE, 58, 20);
+    auto results = completion->GetCompletions(KERNEL_FILE, line, column);
 
     auto it =
         std::find_if(results.begin(), results.end(), [](const CompletionResult& r) { return r.label == "getChannel"; });
@@ -131,7 +130,7 @@ TEST_F(CompletionTest, FunctionCommitCharacters)
 // Test completion has all required fields
 TEST_F(CompletionTest, CompletionResultFields)
 {
-    auto results = completion->GetCompletions(KERNEL_FILE, 58, 20);
+    auto results = completion->GetCompletions(KERNEL_FILE, line, column);
 
     ASSERT_GT(results.size(), 0);
 
@@ -148,7 +147,7 @@ TEST_F(CompletionTest, CompletionResultFields)
 // Test tags for deprecated items
 TEST_F(CompletionTest, DeprecatedTags)
 {
-    auto results = completion->GetCompletions(KERNEL_FILE, 58, 20);
+    auto results = completion->GetCompletions(KERNEL_FILE, line, column);
 
     for (const auto& result : results)
     {
@@ -164,7 +163,7 @@ TEST_F(CompletionTest, DeprecatedTags)
 // Test that results have detail information for functions
 TEST_F(CompletionTest, FunctionDetail)
 {
-    auto results = completion->GetCompletions(KERNEL_FILE, 58, 20);
+    auto results = completion->GetCompletions(KERNEL_FILE, line, column);
 
     auto it =
         std::find_if(results.begin(), results.end(), [](const CompletionResult& r) { return r.label == "getChannel"; });

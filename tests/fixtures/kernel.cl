@@ -3,6 +3,10 @@
   \brief Perona – Malik Anisotropic Filter
 */
 
+int getChannel(uint rgb, int channel);
+float quadric(int norm, float thresh);
+float exponential(int norm, float thresh);
+
 #define PM_RED(rgb)     (( (rgb) >> 16) & 0xffu)
 #define PM_GREEN(rgb)   (( (rgb) >> 8 ) & 0xffu)
 #define PM_BLUE(rgb)    (  (rgb)        & 0xffu)
