@@ -81,6 +81,7 @@ set(headers
     definition.hpp
     typedef.hpp
     location.hpp
+    commands.hpp
     jsonrpc.hpp
     log.hpp
     lsp.hpp
@@ -95,6 +96,7 @@ set(sources
     definition.cpp
     typedef.cpp
     location.cpp
+    commands.cpp
     jsonrpc.cpp
     log.cpp
     lsp.cpp
