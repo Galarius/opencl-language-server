@@ -5,11 +5,7 @@
 //  Created by Ilia Shoshin on 7/14/21.
 //
 
-#include <iostream>
-#include <fstream>
-#include <filesystem>
-#include <list>
-
+#include "commands.hpp"
 #include "clinfo.hpp"
 #include "completion.hpp"
 #include "definition.hpp"
@@ -22,7 +18,9 @@
 #include "version.hpp"
 
 #include <CLI/CLI.hpp>
+#include <algorithm>
 #include <csignal>
+#include <list>
 #include <nlohmann/json.hpp>
 
 #if defined(WIN32)
@@ -33,550 +31,12 @@
 
 using namespace ocls;
 
-namespace fs = std::filesystem;
-
 namespace {
-
-std::list<const char*> clVersions = {
-    "cl",
-    "CL",
-    "cl1.0",
-    "CL1.0",
-    "cl1.1",
-    "CL1.1",
-    "cl1.2",
-    "CL1.2",
-    "cl2.0",
-    "CL2.0",
-    "cl3.0",
-    "CL3.0",
-    "clc++",
-    "CLC++",
-    "clc++1.0",
-    "CLC++1.0",
-    "clc++2021",
-    "CLC++2021"};
 
 auto logger()
 {
     return spdlog::get(ocls::LogName::main);
 }
-
-struct SubCommand
-{
-    SubCommand(CLI::App& app, std::string name, std::string description) : cmd {app.add_subcommand(name, description)}
-    {}
-
-    ~SubCommand() = default;
-
-    bool IsParsed() const
-    {
-        return cmd->parsed();
-    }
-
-protected:
-    CLI::App* cmd;
-};
-
-struct CLInfoSubCommand final : public SubCommand
-{
-    CLInfoSubCommand(CLI::App& app) : SubCommand(app, "clinfo", "Show information about available OpenCL devices")
-    {
-        cmd->add_flag("-p,--pretty-print", prettyPrint, "Enable pretty-printing");
-    }
-
-    int Execute(const std::shared_ptr<ICLInfo>& clinfo)
-    {
-        const auto jsonBody = clinfo->json();
-        const auto indentation = prettyPrint ? 4 : -1;
-        const auto info = jsonBody.dump(indentation);
-        logger()->trace("Result: {}", info);
-        std::cout << info << std::endl;
-        return EXIT_SUCCESS;
-    }
-
-private:
-    bool prettyPrint = false;
-};
-
-struct DiagnosticsSubCommand final : public SubCommand
-{
-    DiagnosticsSubCommand(CLI::App& app) : SubCommand(app, "diagnostics", "Provides an OpenCL kernel diagnostics")
-    {
-        cmd->add_flag("-j,--json", json, "Print diagnostics in JSON format");
-        cmd->add_option("-k,--kernel", kernel, "Path to a kernel file")->required(true);
-        cmd->add_option("-b,--build-options", buildOptions, "Options to be utilized when building the program.")
-            ->capture_default_str();
-        cmd->add_option(
-               "-d,--device-id",
-               deviceID,
-               "Device ID or 0 (automatic selection) of the OpenCL device to be used for diagnostics.")
-            ->capture_default_str();
-        cmd->add_option("--error-limit", maxNumberOfProblems, "The maximum number of errors parsed by the compiler.")
-            ->capture_default_str();
-    }
-
-    int Execute(const std::shared_ptr<IDiagnostics>& diagnostics)
-    {
-        if (!fs::exists(kernel))
-        {
-            std::cerr << "Kernel file does not exist" << std::endl;
-            return EXIT_FAILURE;
-        }
-
-        auto content = utils::ReadFileContent(kernel);
-        if (!content.has_value())
-        {
-            return EXIT_FAILURE;
-        }
-
-        try
-        {
-            if (deviceID > 0)
-            {
-                diagnostics->SetOpenCLDevice(deviceID);
-            }
-
-            if (!buildOptions.empty())
-            {
-                diagnostics->SetBuildOptions(buildOptions);
-            }
-
-            if (maxNumberOfProblems != INT8_MAX)
-            {
-                diagnostics->SetMaxProblemsCount(maxNumberOfProblems);
-            }
-
-            Source source {kernel, *content};
-            if (json)
-            {
-                auto output = diagnostics->GetDiagnostics(source);
-                std::cout << output.dump(4) << std::endl;
-            }
-            else
-            {
-                auto output = diagnostics->GetBuildLog(source);
-                std::cout << output << std::endl;
-            }
-        }
-        catch (std::exception& err)
-        {
-            std::cerr << "Failed to get diagnostics: " << err.what() << std::endl;
-            return EXIT_FAILURE;
-        }
-
-        return EXIT_SUCCESS;
-    }
-
-private:
-    std::string kernel;
-    std::string buildOptions;
-    uint32_t deviceID = 0;
-    uint64_t maxNumberOfProblems = INT8_MAX;
-    bool json = false;
-};
-
-struct CompletionSubCommand final : public SubCommand
-{
-    CompletionSubCommand(CLI::App& app) : SubCommand(app, "completion", "Provides an OpenCL kernel completions")
-    {
-        cmd->add_flag("-j,--json", json, "Print diagnostics in JSON format");
-        cmd->add_option("-k,--kernel", kernel, "Path to a kernel file")->required(true);
-
-        // https://clang.llvm.org/docs/ClangCommandLineReference.html
-        cmd->add_option("--cl-std", clVersion, "OpenCL version")
-            ->check(CLI::IsMember(clVersions))
-            ->required(true)
-            ->capture_default_str();
-        cmd->add_option("-l,--line", line, "line number (1-based)")->required(true)->capture_default_str();
-        cmd->add_option("-c,--column", column, "column number (1-based)")->required(true)->capture_default_str();
-    }
-
-    int Execute()
-    {
-        try
-        {
-            auto options = BuildDefaultTranslationOptions(clVersion);
-            auto store = CreateTranslationUnitStore();
-            store->SaveHeaders();
-            store->SetTranslationOptions(options);
-            auto completion = CreateCompletion(store);
-
-            if (!fs::exists(kernel))
-            {
-                std::cerr << "Kernel file does not exist" << std::endl;
-                return EXIT_FAILURE;
-            }
-
-            auto content = utils::ReadFileContent(kernel);
-            if (!content.has_value())
-            {
-                return EXIT_FAILURE;
-            }
-            store->OnFileOpen(kernel, *content);
-            auto completions = completion->GetCompletions(kernel, line, column);
-            store->OnFileClose(kernel);
-
-            if (json)
-            {
-                nlohmann::json completionItems = nlohmann::json::array();
-                for (const auto& item : completions)
-                {
-                    completionItems.emplace_back(item.toJson());
-                }
-                std::cout << completionItems.dump(4) << std::endl;
-            }
-            else
-            {
-                std::cout << "#" << ", "
-                          << "label" << ", "
-                          << "detail" << ", "
-                          << "insertText" << ", "
-                          << "isSnippet" << ", "
-                          << "documentation" << ", "
-                          << "itemKind" << ", "
-                          << "sortText" << ", "
-                          << "deprecated" << ", "
-                          << "commitCharacters" << ", "
-                          << "tags" << ", "
-                          << "preselect" << std::endl;
-
-                int index = 1;
-
-                for (auto& item : completions)
-                {
-                    std::string commitCharsStr = "[";
-                    for (const auto& ch : item.commitCharacters)
-                    {
-                        commitCharsStr += "'" + ch + "', ";
-                    }
-                    if (!item.commitCharacters.empty())
-                    {
-                        commitCharsStr.pop_back();
-                        commitCharsStr.pop_back();
-                    }
-                    commitCharsStr += "]";
-
-                    // convert tags to string for printing
-                    std::string tagsStr = "[";
-                    for (const auto& tag : item.tags)
-                    {
-                        tagsStr += std::to_string(tag) + ", ";
-                    }
-                    if (!item.tags.empty())
-                    {
-                        tagsStr.pop_back();
-                        tagsStr.pop_back();
-                    }
-                    tagsStr += "]";
-
-                    std::cout << index++ << ", " << item.label << ", " << item.detail << ", " << item.insertText << ", "
-                              << utils::FormatBool(item.isSnippet) << ", " << item.documentation << ", "
-                              << static_cast<unsigned>(item.itemKind) << ", " << item.sortText << ", "
-                              << utils::FormatBool(item.deprecated) << ", " << commitCharsStr << ", " << tagsStr << ", "
-                              << utils::FormatBool(item.preselect) << std::endl;
-                }
-                std::cout << std::endl;
-            }
-        }
-        catch (std::exception& err)
-        {
-            std::cerr << "Failed to get completion: " << err.what() << std::endl;
-            return EXIT_FAILURE;
-        }
-
-        return EXIT_SUCCESS;
-    }
-
-private:
-    std::string kernel;
-    uint32_t line = 0;
-    uint32_t column = 0;
-    std::string clVersion;
-    bool json = false;
-};
-
-struct DefinitionSubCommand final : public SubCommand
-{
-    DefinitionSubCommand(CLI::App& app)
-        : SubCommand(
-              app, "definition", "Resolves the definition location of a symbol at a given text document position")
-    {
-        cmd->add_flag("-j,--json", json, "Print diagnostics in JSON format");
-        cmd->add_option("-k,--kernel", kernel, "Path to a kernel file")->required(true);
-
-        // https://clang.llvm.org/docs/ClangCommandLineReference.html
-        cmd->add_option("--cl-std", clVersion, "OpenCL version")
-            ->check(CLI::IsMember(clVersions))
-            ->required(true)
-            ->capture_default_str();
-        cmd->add_option("-l,--line", line, "line number (1-based)")->required(true)->capture_default_str();
-        cmd->add_option("-c,--column", column, "column number (1-based)")->required(true)->capture_default_str();
-    }
-
-    int Execute()
-    {
-        try
-        {
-            auto options = BuildDefaultTranslationOptions(clVersion);
-            auto store = CreateTranslationUnitStore();
-            store->SaveHeaders();
-            store->SetTranslationOptions(options);
-            auto definition = CreateDefinition(store);
-
-            if (!fs::exists(kernel))
-            {
-                std::cerr << "Kernel file does not exist" << std::endl;
-                return EXIT_FAILURE;
-            }
-
-            auto content = utils::ReadFileContent(kernel);
-            if (!content.has_value())
-            {
-                return EXIT_FAILURE;
-            }
-            store->OnFileOpen(kernel, *content);
-            auto definitions = definition->GetDefinitions(kernel, line, column);
-            store->OnFileClose(kernel);
-
-            if (json)
-            {
-                nlohmann::json definitionItems = nlohmann::json::array();
-                for (const auto& item : definitions)
-                {
-                    definitionItems.emplace_back(item.toJson(true));
-                }
-                std::cout << definitionItems.dump(4) << std::endl;
-            }
-            else
-            {
-                std::cout << "#" << ", "
-                          << "uri" << ", "
-                          << "startLine" << ", "
-                          << "startColumn" << ", "
-                          << "endLine" << ", "
-                          << "endColumn" << ", "
-                          << "selStartLine" << ", "
-                          << "selStartColumn" << ", "
-                          << "selEndLine" << ", "
-                          << "selEndColumn" << std::endl;
-
-                int index = 1;
-
-                for (auto& item : definitions)
-                {
-                    std::cout << index++ << ", " << item.uri << ", " << item.startLine << ", " << item.startColumn
-                              << ", " << item.endLine << ", " << item.endColumn << ", " << item.selStartLine << ", "
-                              << item.selStartColumn << ", " << item.selEndLine << ", " << item.selEndColumn
-                              << std::endl;
-                }
-                std::cout << std::endl;
-            }
-        }
-        catch (std::exception& err)
-        {
-            std::cerr << "Failed to get definition: " << err.what() << std::endl;
-            return EXIT_FAILURE;
-        }
-
-        return EXIT_SUCCESS;
-    }
-
-private:
-    std::string kernel;
-    uint32_t line = 0;
-    uint32_t column = 0;
-    std::string clVersion;
-    bool json = false;
-};
-
-struct TypeDefinitionSubCommand final : public SubCommand
-{
-    TypeDefinitionSubCommand(CLI::App& app)
-        : SubCommand(
-              app, "typedef", "Resolves the type definition location of a symbol at a given text document position")
-    {
-        cmd->add_flag("-j,--json", json, "Print diagnostics in JSON format");
-        cmd->add_option("-k,--kernel", kernel, "Path to a kernel file")->required(true);
-
-        // https://clang.llvm.org/docs/ClangCommandLineReference.html
-        cmd->add_option("--cl-std", clVersion, "OpenCL version")
-            ->check(CLI::IsMember(clVersions))
-            ->required(true)
-            ->capture_default_str();
-        cmd->add_option("-l,--line", line, "line number (1-based)")->required(true)->capture_default_str();
-        cmd->add_option("-c,--column", column, "column number (1-based)")->required(true)->capture_default_str();
-    }
-
-    int Execute()
-    {
-        try
-        {
-            auto options = BuildDefaultTranslationOptions(clVersion);
-            auto store = CreateTranslationUnitStore();
-            store->SaveHeaders();
-            store->SetTranslationOptions(options);
-            auto typeDefinition = CreateTypeDefinition(store);
-
-            if (!fs::exists(kernel))
-            {
-                std::cerr << "Kernel file does not exist" << std::endl;
-                return EXIT_FAILURE;
-            }
-
-            auto content = utils::ReadFileContent(kernel);
-            if (!content.has_value())
-            {
-                return EXIT_FAILURE;
-            }
-            store->OnFileOpen(kernel, *content);
-            auto typeDefinitions = typeDefinition->GetTypeDefinitions(kernel, line, column);
-            store->OnFileClose(kernel);
-
-            if (json)
-            {
-                nlohmann::json typeDefinitionItems = nlohmann::json::array();
-                for (const auto& item : typeDefinitions)
-                {
-                    typeDefinitionItems.emplace_back(item.toJson(true));
-                }
-                std::cout << typeDefinitionItems.dump(4) << std::endl;
-            }
-            else
-            {
-                std::cout << "#" << ", "
-                          << "uri" << ", "
-                          << "startLine" << ", "
-                          << "startColumn" << ", "
-                          << "endLine" << ", "
-                          << "endColumn" << ", "
-                          << "selStartLine" << ", "
-                          << "selStartColumn" << ", "
-                          << "selEndLine" << ", "
-                          << "selEndColumn" << std::endl;
-
-                int index = 1;
-
-                for (auto& item : typeDefinitions)
-                {
-                    std::cout << index++ << ", " << item.uri << ", " << item.startLine << ", " << item.startColumn
-                              << ", " << item.endLine << ", " << item.endColumn << ", " << item.selStartLine << ", "
-                              << item.selStartColumn << ", " << item.selEndLine << ", " << item.selEndColumn
-                              << std::endl;
-                }
-                std::cout << std::endl;
-            }
-        }
-        catch (std::exception& err)
-        {
-            std::cerr << "Failed to get type definition: " << err.what() << std::endl;
-            return EXIT_FAILURE;
-        }
-
-        return EXIT_SUCCESS;
-    }
-
-private:
-    std::string kernel;
-    uint32_t line = 0;
-    uint32_t column = 0;
-    std::string clVersion;
-    bool json = false;
-};
-
-struct DeclarationSubCommand final : public SubCommand
-{
-    DeclarationSubCommand(CLI::App& app)
-        : SubCommand(
-              app, "declaration", "Resolves the declaration location of a symbol at a given text document position")
-    {
-        cmd->add_flag("-j,--json", json, "Print diagnostics in JSON format");
-        cmd->add_option("-k,--kernel", kernel, "Path to a kernel file")->required(true);
-
-        // https://clang.llvm.org/docs/ClangCommandLineReference.html
-        cmd->add_option("--cl-std", clVersion, "OpenCL version")
-            ->check(CLI::IsMember(clVersions))
-            ->required(true)
-            ->capture_default_str();
-        cmd->add_option("-l,--line", line, "line number (1-based)")->required(true)->capture_default_str();
-        cmd->add_option("-c,--column", column, "column number (1-based)")->required(true)->capture_default_str();
-    }
-
-    int Execute()
-    {
-        try
-        {
-            auto options = BuildDefaultTranslationOptions(clVersion);
-            auto store = CreateTranslationUnitStore();
-            store->SaveHeaders();
-            store->SetTranslationOptions(options);
-            auto declaration = CreateDeclaration(store);
-
-            if (!fs::exists(kernel))
-            {
-                std::cerr << "Kernel file does not exist" << std::endl;
-                return EXIT_FAILURE;
-            }
-
-            auto content = utils::ReadFileContent(kernel);
-            if (!content.has_value())
-            {
-                return EXIT_FAILURE;
-            }
-            store->OnFileOpen(kernel, *content);
-            auto declarations = declaration->GetDeclarations(kernel, line, column);
-            store->OnFileClose(kernel);
-
-            if (json)
-            {
-                nlohmann::json declarationItems = nlohmann::json::array();
-                for (const auto& item : declarations)
-                {
-                    declarationItems.emplace_back(item.toJson(true));
-                }
-                std::cout << declarationItems.dump(4) << std::endl;
-            }
-            else
-            {
-                std::cout << "#" << ", "
-                          << "uri" << ", "
-                          << "startLine" << ", "
-                          << "startColumn" << ", "
-                          << "endLine" << ", "
-                          << "endColumn" << ", "
-                          << "selStartLine" << ", "
-                          << "selStartColumn" << ", "
-                          << "selEndLine" << ", "
-                          << "selEndColumn" << std::endl;
-
-                int index = 1;
-
-                for (auto& item : declarations)
-                {
-                    std::cout << index++ << ", " << item.uri << ", " << item.startLine << ", " << item.startColumn
-                              << ", " << item.endLine << ", " << item.endColumn << ", " << item.selStartLine << ", "
-                              << item.selStartColumn << ", " << item.selEndLine << ", " << item.selEndColumn
-                              << std::endl;
-                }
-                std::cout << std::endl;
-            }
-        }
-        catch (std::exception& err)
-        {
-            std::cerr << "Failed to get declaration: " << err.what() << std::endl;
-            return EXIT_FAILURE;
-        }
-
-        return EXIT_SUCCESS;
-    }
-
-private:
-    std::string kernel;
-    uint32_t line = 0;
-    uint32_t column = 0;
-    std::string clVersion;
-    bool json = false;
-};
 
 std::shared_ptr<ILSPServer> server;
 
@@ -639,13 +99,16 @@ int main(int argc, char* argv[])
         },
         "Show version");
 
-    CLInfoSubCommand clInfoCmd(app);
-    DiagnosticsSubCommand diagnosticsCmd(app);
-    CompletionSubCommand completionCmd(app);
-    DefinitionSubCommand definitionCmd(app);
-    TypeDefinitionSubCommand typeDefinitionCmd(app);
-    DeclarationSubCommand declarationCmd(app);
+    std::list<std::shared_ptr<SubCommand>> subCommands {
+        std::make_shared<CLInfoSubCommand>(app),
+        std::make_shared<DiagnosticsSubCommand>(app),
+        std::make_shared<CompletionSubCommand>(app),
+        MakeDefinitionSubCommand(app),
+        MakeDeclarationSubCommand(app),
+        MakeTypeDefinitionSubCommand(app)};
+
     CLI11_PARSE(app, argc, argv);
+
     if (flagLogTofile)
     {
         ConfigureFileLogging(optLogFile, optLogLevel);
@@ -658,48 +121,25 @@ int main(int argc, char* argv[])
     logger()->info("OpenCL Language Server {}", ocls::version);
     logger()->info("{}", GetClangVersion());
 
-    auto clinfo = CreateCLInfo();
-
     int result = 0;
     do
     {
-        if (clInfoCmd.IsParsed())
+        auto it = std::find_if(subCommands.begin(), subCommands.end(), [](const std::shared_ptr<SubCommand>& command) {
+            return command->IsParsed();
+        });
+
+        if (it != subCommands.end())
         {
-            result = clInfoCmd.Execute(clinfo);
+            result = it->get()->Execute();
             break;
-        }
-
-        auto diagnostics = CreateDiagnostics(clinfo);
-        if (diagnosticsCmd.IsParsed())
-        {
-            result = diagnosticsCmd.Execute(diagnostics);
-            break;
-        }
-
-        if (completionCmd.IsParsed())
-        {
-            return completionCmd.Execute();
-        }
-
-        if (definitionCmd.IsParsed())
-        {
-            return definitionCmd.Execute();
-        }
-
-        if (typeDefinitionCmd.IsParsed())
-        {
-            return typeDefinitionCmd.Execute();
-        }
-
-        if (declarationCmd.IsParsed())
-        {
-            return declarationCmd.Execute();
         }
 
         SetupBinaryStreamMode();
         std::signal(SIGINT, SignalHandler);
 
         auto jrpc = CreateJsonRPC();
+        auto clinfo = CreateCLInfo();
+        auto diagnostics = CreateDiagnostics(clinfo);
         auto device = diagnostics->GetDevice();
         auto clStandard = device ? device->GetCLStandard() : "CL";
         auto options = BuildDefaultTranslationOptions(clStandard);
