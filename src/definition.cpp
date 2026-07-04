@@ -20,64 +20,6 @@ auto logger()
     return spdlog::get(ocls::LogName::definition);
 }
 
-/**
- Build a location record from a cursor, splitting the "full" extent
- (e.g. the whole function body) from the narrower "selection" extent
- (just the identifier), matching what LocationLink needs.
- */
-std::optional<ocls::DefinitionLocation> makeLocation(CXCursor cursor)
-{
-    if (clang_Cursor_isNull(cursor))
-    {
-        return std::nullopt;
-    }
-
-    CXSourceRange fullRange = clang_getCursorExtent(cursor);
-    CXSourceLocation nameLoc = clang_getCursorLocation(cursor);
-
-    CXFile file;
-    unsigned startLine, startCol, endLine, endCol;
-    clang_getSpellingLocation(clang_getRangeStart(fullRange), &file, &startLine, &startCol, nullptr);
-    clang_getSpellingLocation(clang_getRangeEnd(fullRange), nullptr, &endLine, &endCol, nullptr);
-
-    if (!file)
-    {
-        return std::nullopt;
-    }
-
-    CXString fileNameStr = clang_getFileName(file);
-    const char *fileNameC = clang_getCString(fileNameStr);
-    if (!fileNameC)
-    {
-        clang_disposeString(fileNameStr);
-        return std::nullopt;
-    }
-    std::string filePath = fileNameC;
-    clang_disposeString(fileNameStr);
-
-    unsigned selLine, selCol;
-    clang_getSpellingLocation(nameLoc, nullptr, &selLine, &selCol, nullptr);
-
-    CXString spelling = clang_getCursorSpelling(cursor);
-    const char *spellingCStr = clang_getCString(spelling);
-    unsigned nameLen = spellingCStr ? static_cast<unsigned>(strlen(spellingCStr)) : 0;
-    clang_disposeString(spelling);
-
-    ocls::DefinitionLocation loc;
-    loc.uri = filePath;
-    // Convert from libclang's 1-based to LSP's 0-based.
-    loc.startLine = startLine > 0 ? startLine - 1 : 0;
-    loc.startColumn = startCol > 0 ? startCol - 1 : 0;
-    loc.endLine = endLine > 0 ? endLine - 1 : 0;
-    loc.endColumn = endCol > 0 ? endCol - 1 : 0;
-    loc.selStartLine = selLine > 0 ? selLine - 1 : 0;
-    loc.selStartColumn = selCol > 0 ? selCol - 1 : 0;
-    loc.selEndLine = loc.selStartLine;
-    loc.selEndColumn = loc.selStartColumn + nameLen;
-
-    return loc;
-}
-
 struct VisitorContext
 {
     CXCursor target;
@@ -111,7 +53,7 @@ class Definition final : public IDefinition
 public:
     explicit Definition(std::shared_ptr<ITranslationUnitStore> store) : m_store(std::move(store)) {}
 
-    std::vector<DefinitionLocation> GetDefinitions(
+    std::vector<Location> GetDefinitions(
         const std::string &filePath, unsigned lineno, unsigned columnno) override;
 
 private:
@@ -132,7 +74,7 @@ std::vector<CXCursor> Definition::FindDefinitions(CXTranslationUnit tu, CXCursor
     return results;
 }
 
-std::vector<DefinitionLocation> Definition::GetDefinitions(
+std::vector<Location> Definition::GetDefinitions(
     const std::string &filePath, unsigned lineno, unsigned columnno)
 {
     logger()->debug("Get definitions for {}:{}:{}", filePath, lineno, columnno);
@@ -177,11 +119,11 @@ std::vector<DefinitionLocation> Definition::GetDefinitions(
         implCursors = FindDefinitions(translationUnit, declCursor);
     }
 
-    std::vector<DefinitionLocation> locations;
+    std::vector<Location> locations;
     locations.reserve(implCursors.size());
     for (const auto &implCursor : implCursors)
     {
-        auto location = makeLocation(implCursor);
+        auto location = MakeLocation(implCursor);
         if (location)
         {
             locations.push_back(std::move(*location));

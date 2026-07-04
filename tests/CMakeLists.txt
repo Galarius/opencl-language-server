@@ -8,6 +8,7 @@ set(sources
     completion.cpp
     definition.cpp
     translation.cpp
+    location.cpp
 )
 list(TRANSFORM sources PREPEND "${PROJECT_SOURCE_DIR}/src/")
 set(test_sources
