@@ -56,14 +56,6 @@ struct ITranslationUnitStore
      * \c OnFileChange / \c OnFileClose call for the same file.
      */
     virtual const std::string *GetContent(const std::string &filePath) const = 0;
-
-    /**
-     * Convenience helper: resolves a \c CXCursor at the given 1-based
-     * line/column in \c filePath using the cached translation unit.
-     * Returns a null cursor (\c clang_Cursor_isNull) if the TU is missing
-     * or the file cannot be located within it.
-     */
-    virtual CXCursor GetCursorAt(const std::string &filePath, unsigned lineno, unsigned columnno) const = 0;
 };
 
 std::shared_ptr<ITranslationUnitStore> CreateTranslationUnitStore();

@@ -6,6 +6,7 @@
 
 - [x] [`textDocument/publishDiagnostics`](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_publishDiagnostics)
 - [x] [`textDocument/completion`](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_completion)
+- [x] [`textDocument/definition`](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.18/specification/#textDocument_definition)
 
 ## Prerequisites
 
@@ -68,6 +69,8 @@ SUBCOMMANDS:
   clinfo                      Show information about available OpenCL devices
   diagnostics                 Provides an OpenCL kernel diagnostics
   completion                  Provides an OpenCL kernel completions
+  definition                  Resolves the definition location of a symbol at a given text
+                              document position
 ```
 
 ## Clients

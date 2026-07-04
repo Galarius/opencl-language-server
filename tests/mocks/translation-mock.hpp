@@ -21,6 +21,5 @@ public:
     MOCK_METHOD(void, SaveHeaders, (), (override));
 
     MOCK_METHOD(CXTranslationUnit, GetTranslationUnit, (const std::string &), (const override));
-    MOCK_METHOD(std::string *, GetContent, (const std::string &), (const override));
-    MOCK_METHOD(CXCursor, GetCursorAt, (const std::string &, unsigned, unsigned), (const override));
+    MOCK_METHOD(std::string *, GetContent, (const std::string &), (const override));    
 };

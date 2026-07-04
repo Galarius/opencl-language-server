@@ -66,7 +66,6 @@ public:
 
     CXTranslationUnit GetTranslationUnit(const std::string &filePath) const override;
     const std::string *GetContent(const std::string &filePath) const override;
-    CXCursor GetCursorAt(const std::string &filePath, unsigned lineno, unsigned columnno) const override;
 
 private:
     void DestroyTranslationUnits() noexcept;
@@ -170,9 +169,13 @@ void TranslationUnitStore::OnFileOpen(const std::string &filePath, const std::st
 
     auto unsavedFiles = BuildUnsavedPool(filePath, content);
     unsigned options = clang_defaultEditingTranslationUnitOptions();
-    options |= CXTranslationUnit_SkipFunctionBodies;
     options |= CXTranslationUnit_IncludeBriefCommentsInCodeCompletion;
-    
+    options |= CXTranslationUnit_SkipFunctionBodies;
+    options |= CXTranslationUnit_LimitSkipFunctionBodiesToPreamble;
+    options |= CXTranslationUnit_DetailedPreprocessingRecord;
+    options |= CXTranslationUnit_PrecompiledPreamble;
+    options |= CXTranslationUnit_KeepGoing;
+    options |= CXTranslationUnit_IgnoreNonErrorsFromIncludedFiles;
 
     std::vector<const char *> cargs;
     cargs.reserve(m_args.size());
@@ -295,25 +298,6 @@ const std::string *TranslationUnitStore::GetContent(const std::string &filePath)
         return nullptr;
     }
     return &it->second;
-}
-
-CXCursor TranslationUnitStore::GetCursorAt(const std::string &filePath, unsigned lineno, unsigned columnno) const
-{
-    CXTranslationUnit tu = GetTranslationUnit(filePath);
-    if (!tu)
-    {
-        return clang_getNullCursor();
-    }
-
-    CXFile file = clang_getFile(tu, filePath.c_str());
-    if (!file)
-    {
-        logger()->error("Unable to get file for {}", filePath);
-        return clang_getNullCursor();
-    }
-
-    CXSourceLocation loc = clang_getLocation(tu, file, lineno, columnno);
-    return clang_getCursor(tu, loc);
 }
 
 std::shared_ptr<ITranslationUnitStore> CreateTranslationUnitStore()

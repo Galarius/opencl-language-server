@@ -77,6 +77,7 @@ set(headers
     diagnostics.hpp
     translation.hpp
     completion.hpp
+    definition.hpp
     jsonrpc.hpp
     log.hpp
     lsp.hpp
@@ -87,6 +88,7 @@ set(sources
     diagnostics.cpp
     translation.cpp
     completion.cpp
+    definition.cpp
     jsonrpc.cpp
     log.cpp
     lsp.cpp

@@ -6,6 +6,7 @@ set(sources
     lsp.cpp
     utils.cpp
     completion.cpp
+    definition.cpp
     translation.cpp
 )
 list(TRANSFORM sources PREPEND "${PROJECT_SOURCE_DIR}/src/")
@@ -14,6 +15,7 @@ set(test_sources
     diagnostics-parser-tests.cpp
     diagnostics-tests.cpp
     completion-tests.cpp
+    definition-tests.cpp
     lsp-event-handler-tests.cpp
     utils-tests.cpp
     main.cpp

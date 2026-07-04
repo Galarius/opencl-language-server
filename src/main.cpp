@@ -8,9 +8,11 @@
 #include <iostream>
 #include <fstream>
 #include <filesystem>
+#include <list>
 
 #include "clinfo.hpp"
 #include "completion.hpp"
+#include "definition.hpp"
 #include "diagnostics.hpp"
 #include "jsonrpc.hpp"
 #include "log.hpp"
@@ -32,6 +34,26 @@ using namespace ocls;
 namespace fs = std::filesystem;
 
 namespace {
+
+std::list<const char*> clVersions = {
+    "cl",
+    "CL",
+    "cl1.0",
+    "CL1.0",
+    "cl1.1",
+    "CL1.1",
+    "cl1.2",
+    "CL1.2",
+    "cl2.0",
+    "CL2.0",
+    "cl3.0",
+    "CL3.0",
+    "clc++",
+    "CLC++",
+    "clc++1.0",
+    "CLC++1.0",
+    "clc++2021",
+    "CLC++2021"};
 
 auto logger()
 {
@@ -161,26 +183,7 @@ struct CompletionSubCommand final : public SubCommand
 
         // https://clang.llvm.org/docs/ClangCommandLineReference.html
         cmd->add_option("--cl-std", clVersion, "OpenCL version")
-            ->check(
-                CLI::IsMember(
-                    {"cl",
-                     "CL",
-                     "cl1.0",
-                     "CL1.0",
-                     "cl1.1",
-                     "CL1.1",
-                     "cl1.2",
-                     "CL1.2",
-                     "cl2.0",
-                     "CL2.0",
-                     "cl3.0",
-                     "CL3.0",
-                     "clc++",
-                     "CLC++",
-                     "clc++1.0",
-                     "CLC++1.0",
-                     "clc++2021",
-                     "CLC++2021"}))
+            ->check(CLI::IsMember(clVersions))
             ->required(true)
             ->capture_default_str();
         cmd->add_option("-l,--line", line, "line number (1-based)")->required(true)->capture_default_str();
@@ -291,6 +294,100 @@ private:
     bool json = false;
 };
 
+struct DefinitionSubCommand final : public SubCommand
+{
+    DefinitionSubCommand(CLI::App& app)
+        : SubCommand(
+              app, "definition", "Resolves the definition location of a symbol at a given text document position")
+    {
+        cmd->add_flag("-j,--json", json, "Print diagnostics in JSON format");
+        cmd->add_option("-k,--kernel", kernel, "Path to a kernel file")->required(true);
+
+        // https://clang.llvm.org/docs/ClangCommandLineReference.html
+        cmd->add_option("--cl-std", clVersion, "OpenCL version")
+            ->check(CLI::IsMember(clVersions))
+            ->required(true)
+            ->capture_default_str();
+        cmd->add_option("-l,--line", line, "line number (1-based)")->required(true)->capture_default_str();
+        cmd->add_option("-c,--column", column, "column number (1-based)")->required(true)->capture_default_str();
+    }
+
+    int Execute()
+    {
+        try
+        {
+            auto options = BuildDefaultTranslationOptions(clVersion);
+            auto store = CreateTranslationUnitStore();
+            store->SaveHeaders();
+            store->SetTranslationOptions(options);
+            auto definition = CreateDefinition(store);
+
+            if (!fs::exists(kernel))
+            {
+                std::cerr << "Kernel file does not exist" << std::endl;
+                return EXIT_FAILURE;
+            }
+
+            auto content = utils::ReadFileContent(kernel);
+            if (!content.has_value())
+            {
+                return EXIT_FAILURE;
+            }
+            store->OnFileOpen(kernel, *content);
+            auto definitions = definition->GetDefinitions(kernel, line, column);
+            store->OnFileClose(kernel);
+
+            if (json)
+            {
+                nlohmann::json definitionItems = nlohmann::json::array();
+                for (const auto& item : definitions)
+                {
+                    definitionItems.emplace_back(item.toJson(true));
+                }
+                std::cout << definitionItems.dump(4) << std::endl;
+            }
+            else
+            {
+                std::cout << "#" << ", "
+                          << "uri" << ", "
+                          << "startLine" << ", "
+                          << "startColumn" << ", "
+                          << "endLine" << ", "
+                          << "endColumn" << ", "
+                          << "selStartLine" << ", "
+                          << "selStartColumn" << ", "
+                          << "selEndLine" << ", "
+                          << "selEndColumn" << std::endl;
+
+                int index = 1;
+
+                for (auto& item : definitions)
+                {
+                    std::cout << index++ << ", " << item.uri << ", " << item.startLine << ", " << item.startColumn
+                              << ", " << item.endLine << ", " << item.endColumn << ", " << item.selStartLine << ", "
+                              << item.selStartColumn << ", " << item.selEndLine << ", " << item.selEndColumn
+                              << std::endl;
+                }
+                std::cout << std::endl;
+            }
+        }
+        catch (std::exception& err)
+        {
+            std::cerr << "Failed to get definition: " << err.what() << std::endl;
+            return EXIT_FAILURE;
+        }
+
+        return EXIT_SUCCESS;
+    }
+
+private:
+    std::string kernel;
+    uint32_t line = 0;
+    uint32_t column = 0;
+    std::string clVersion;
+    bool json = false;
+};
+
 std::shared_ptr<ILSPServer> server;
 
 static void SignalHandler(int)
@@ -355,6 +452,7 @@ int main(int argc, char* argv[])
     CLInfoSubCommand clInfoCmd(app);
     DiagnosticsSubCommand diagnosticsCmd(app);
     CompletionSubCommand completionCmd(app);
+    DefinitionSubCommand definitionCmd(app);
     CLI11_PARSE(app, argc, argv);
     if (flagLogTofile)
     {
@@ -364,7 +462,7 @@ int main(int argc, char* argv[])
     {
         ConfigureNullLogging();
     }
-    
+
     logger()->info("OpenCL Language Server {}", ocls::version);
     logger()->info("{}", GetClangVersion());
 
@@ -391,6 +489,11 @@ int main(int argc, char* argv[])
             return completionCmd.Execute();
         }
 
+        if (definitionCmd.IsParsed())
+        {
+            return definitionCmd.Execute();
+        }
+
         SetupBinaryStreamMode();
         std::signal(SIGINT, SignalHandler);
 
@@ -400,9 +503,10 @@ int main(int argc, char* argv[])
         auto options = BuildDefaultTranslationOptions(clStandard);
         auto store = CreateTranslationUnitStore();
         auto completion = CreateCompletion(store);
+        auto definition = CreateDefinition(store);
         store->SaveHeaders();
         store->SetTranslationOptions(options);
-        server = CreateLSPServer(jrpc, store, diagnostics, completion);
+        server = CreateLSPServer(jrpc, store, diagnostics, completion, definition);
         result = server->Run();
     } while (false);
 
