@@ -15,5 +15,5 @@ class DefinitionMock : public ocls::IDefinition
 {
 public:
     MOCK_METHOD(
-        std::vector<ocls::DefinitionLocation>, GetDefinitions, (const std::string &, unsigned, unsigned), (override));
+        std::vector<ocls::Location>, GetDefinitions, (const std::string &, unsigned, unsigned), (override));
 };

@@ -8,58 +8,14 @@
 #pragma once
 
 #include "translation.hpp"
+#include "location.hpp"
 
 #include <memory>
 #include <optional>
 #include <string>
 #include <vector>
-#include <nlohmann/json.hpp>
 
 namespace ocls {
-
-/**
- Represents a single resolved location, matching the fields needed to
- build either an LSP `Location` or `LocationLink`.
-
- line/column values are 0-based, matching LSP's convention.
- */
-struct DefinitionLocation
-{
-    std::string uri;
-    unsigned startLine;
-    unsigned startColumn;
-    unsigned endLine;
-    unsigned endColumn;
-    // Narrower "selection" range (usually just the identifier),
-    // used for `targetSelectionRange` in `LocationLink`.
-    unsigned selStartLine;
-    unsigned selStartColumn;
-    unsigned selEndLine;
-    unsigned selEndColumn;
-
-    nlohmann::json toJson(bool linkSupport) const
-    {
-        if (linkSupport)
-        {
-            return nlohmann::json {
-                {"targetUri", uri},
-                {"targetRange",
-                 {{"start", {{"line", startLine}, {"character", startColumn}}},
-                  {"end", {{"line", endLine}, {"character", endColumn}}}}},
-                {"targetSelectionRange",
-                 {{"start", {{"line", selStartLine}, {"character", selStartColumn}}},
-                  {"end", {{"line", selEndLine}, {"character", selEndColumn}}}}}};
-        }
-        else
-        {
-            return nlohmann::json {
-                {"uri", uri},
-                {"range",
-                 {{"start", {{"line", selStartLine}, {"character", selStartColumn}}},
-                  {"end", {{"line", selEndLine}, {"character", selEndColumn}}}}}};
-        }
-    }
-};
 
 /**
  Provides `textDocument/definition` results: given a symbol position
@@ -73,7 +29,7 @@ struct IDefinition
     /**
      \note \c lineno / \c columnno are 1-based values
      */
-    virtual std::vector<DefinitionLocation> GetDefinitions(
+    virtual std::vector<Location> GetDefinitions(
         const std::string &filePath, unsigned lineno, unsigned columnno) = 0;
 };
 
