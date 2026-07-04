@@ -75,6 +75,7 @@ set(headers
     clinfo.hpp
     device.hpp
     diagnostics.hpp
+    translation.hpp
     completion.hpp
     jsonrpc.hpp
     log.hpp
@@ -84,6 +85,7 @@ set(headers
 set(sources
     clinfo.cpp
     diagnostics.cpp
+    translation.cpp
     completion.cpp
     jsonrpc.cpp
     log.cpp

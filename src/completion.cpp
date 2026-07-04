@@ -7,8 +7,6 @@
 
 #include "completion.hpp"
 #include "log.hpp"
-#include "utils.hpp"
-#include "version.hpp"
 
 #include <clang-c/Index.h>
 #include <cstdio>
@@ -17,18 +15,8 @@
 #include <memory>
 #include <unordered_map>
 #include <vector>
-#include <fstream>
-#include <filesystem>
-
-// Generated
-#include "embedded_headers.h"
-
-namespace fs = std::filesystem;
 
 namespace {
-
-constexpr int excludeDeclsFromPCH = 0;
-constexpr int displayDiagnostics = 0;
 
 auto logger()
 {
@@ -57,26 +45,6 @@ std::unordered_map<CXCompletionChunkKind, std::string> completeChunkKindSpelling
     {CXCompletionChunk_Equal, "Equal"},
     {CXCompletionChunk_HorizontalSpace, "HorizontalSpace"},
     {CXCompletionChunk_VerticalSpace, "VerticalSpace"}};
-
-std::unordered_map<CXTokenKind, std::string> completeTokenKindSpellingMap = {
-    {CXToken_Punctuation, "Punctuation"},
-    {CXToken_Keyword, "Keyword"},
-    {CXToken_Identifier, "Identifier"},
-    {CXToken_Literal, "Literal"},
-    {CXToken_Comment, "Comment"}};
-
-std::unordered_map<CXErrorCode, std::string> translationErrorSpellingMap = {
-    {CXError_Failure, "Failure"},
-    {CXError_Crashed, "Crashed"},
-    {CXError_InvalidArguments, "InvalidArguments"},
-    {CXError_ASTReadError, "ASTReadError"},
-    {CXError_Success, "Success"}};
-
-struct TranslationUnitEntry
-{
-    CXTranslationUnit tu;
-    CXIndex index;
-};
 
 std::string getCompleteChunkKindSpelling(CXCompletionChunkKind chunkKind)
 {
@@ -307,29 +275,14 @@ namespace ocls {
 class Completion final : public ICompletion
 {
 public:
+    explicit Completion(std::shared_ptr<ITranslationUnitStore> store) 
+        : m_store(std::move(store)) {
+        }
 
-    ~Completion() override
-    {
-        DestroyTranslationUnits();
-
-        DeleteCache();
-    }
-
-    void OnFileOpen(const std::string &filePath, const std::string &content) override;
-    void OnFileChange(const std::string &filePath, const std::string &content) override;
-    void OnFileClose(const std::string &filePath) override;
-    void SetTranslationOptions(const std::vector<std::string> &options) override;
-
-    void SaveHeaders() override;
     std::vector<CompletionResult> GetCompletions(
         const std::string &filePath, unsigned lineno, unsigned columnno) override;
 
 private:
-    void DestroyTranslationUnits() noexcept;
-    void DeleteCache() noexcept;
-
-    std::vector<CXUnsavedFile> BuildUnsavedPool(const std::string &filePath, const std::string &content);
-
     std::vector<CompletionResult> FilterCompletions(CXCodeCompleteResults *compResults, const std::string &prefix);
 
     std::optional<std::string> GetPrefix(
@@ -340,204 +293,8 @@ private:
         unsigned &startColumnno);
 
 private:
-    std::optional<fs::path> m_cacheDir;
-    std::optional<fs::path> m_headersDir;
-    std::vector<std::string> m_args;
-    std::unordered_map<std::string, std::string> m_fileContents;
-    std::unordered_map<std::string, TranslationUnitEntry> m_translationUnits;
+    std::shared_ptr<ITranslationUnitStore> m_store;
 };
-
-void Completion::DestroyTranslationUnits() noexcept
-{
-    try
-    {
-        logger()->trace("Completion::DestroyTranslationUnits");
-        for (auto &[filePath, entry] : m_translationUnits)
-        {
-            m_fileContents.erase(filePath);
-            clang_disposeTranslationUnit(entry.tu);
-            clang_disposeIndex(entry.index);
-        }
-    }
-    catch (...)
-    {}
-}
-
-void Completion::SaveHeaders()
-{
-#if defined(__APPLE__)
-    auto temp = fs::temp_directory_path() / "com.galarius.opencl-language-server";
-#else
-    auto temp = fs::temp_directory_path() / "opencl-language-server";
-#endif
-    auto headersDir = temp / version / "headers";
-
-    logger()->debug("Using cache dir: {}", temp.string());
-    fs::create_directories(headersDir);
-    // Unpack embedded headers onto the disk if they don't exist yet
-    const auto &header_map = resources::get_headers();
-    for (const auto &[filename, contents] : header_map)
-    {
-        fs::path targetFilePath = fs::path(headersDir) / filename;
-        if (!fs::exists(targetFilePath))
-        {
-            std::ofstream file(targetFilePath, std::ios::binary);
-            if (file.is_open())
-            {
-                file.write(contents.data(), contents.size());
-            }
-        }
-    }
-
-    m_cacheDir = temp;
-    m_headersDir = headersDir;
-}
-
-void Completion::DeleteCache() noexcept
-{
-    try
-    {
-        if (m_cacheDir && fs::exists(*m_cacheDir))
-        {
-            auto cacheDir = m_cacheDir.value();
-            logger()->debug("Deleting cache dir {}", cacheDir.string());
-            fs::remove_all(cacheDir);
-        }
-    }
-    catch (...)
-    {}
-}
-
-std::vector<CXUnsavedFile> Completion::BuildUnsavedPool(const std::string &filePath, const std::string &content)
-{
-    std::vector<CXUnsavedFile> unsavedPool;
-    unsavedPool.resize(1);
-    unsavedPool[0].Filename = filePath.c_str();
-    unsavedPool[0].Contents = content.data();
-    unsavedPool[0].Length = static_cast<unsigned long>(content.size());
-    return unsavedPool;
-}
-
-void Completion::OnFileOpen(const std::string &filePath, const std::string &content)
-{
-    logger()->trace("Completion::OnFileOpen - {}", filePath);
-    if (!fs::exists(filePath))
-    {
-        logger()->error("File does not exist: {}", filePath);
-        return;
-    }
-
-    m_fileContents[filePath] = content;
-
-    CXIndex index = clang_createIndex(excludeDeclsFromPCH, displayDiagnostics);
-
-    auto unsavedFiles = BuildUnsavedPool(filePath, content);
-    unsigned options = clang_defaultEditingTranslationUnitOptions();
-    options |= CXTranslationUnit_SkipFunctionBodies;
-    options |= CXTranslationUnit_IncludeBriefCommentsInCodeCompletion;
-
-    std::vector<const char *> cargs;
-    cargs.reserve(m_args.size());
-    for (const auto &arg : m_args)
-    {
-        cargs.push_back(arg.c_str());
-    }
-
-    CXTranslationUnit tu;
-    CXErrorCode code = clang_parseTranslationUnit2(
-        index,
-        filePath.c_str(),
-        cargs.data(),
-        static_cast<int>(cargs.size()),
-        unsavedFiles.data(),
-        static_cast<unsigned int>(unsavedFiles.size()),
-        options,
-        &tu);
-
-    if (code != CXError_Success)
-    {
-        std::string error = translationErrorSpellingMap[code];
-        logger()->error("Parsing failed with error code: {}", error);
-        clang_disposeIndex(index);
-        return;
-    }
-
-    m_translationUnits[filePath] = {tu, index};
-}
-
-void Completion::OnFileChange(const std::string &filePath, const std::string &content)
-{
-    logger()->trace("Completion::OnFileChange - {}", filePath);
-    m_fileContents[filePath] = content;
-
-    auto it = m_translationUnits.find(filePath);
-    if (it == m_translationUnits.end())
-    {
-        logger()->debug("TU does not exist, performing full parse...");
-        // No TU yet, do a full parse
-        OnFileOpen(filePath, content);
-        return;
-    }
-
-    auto unsavedFiles = BuildUnsavedPool(filePath, content);
-    const unsigned options = clang_defaultReparseOptions(it->second.tu);
-
-    // Reparse is much cheaper than a full parse —
-    // reuses the precompiled preamble if it hasn't changed
-    int result = clang_reparseTranslationUnit(
-        it->second.tu, static_cast<unsigned int>(unsavedFiles.size()), unsavedFiles.data(), options);
-
-    if (result != 0)
-    {
-        CXErrorCode code = static_cast<CXErrorCode>(result);
-        std::string error = translationErrorSpellingMap[code];
-        logger()->error("Failed to reparse TU: {}", error);
-        clang_disposeTranslationUnit(it->second.tu);
-        clang_disposeIndex(it->second.index);
-        m_translationUnits.erase(it);
-        OnFileOpen(filePath, content);
-    }
-}
-
-void Completion::OnFileClose(const std::string &filePath)
-{
-    logger()->trace("Completion::OnFileClose - {}", filePath);
-    m_fileContents.erase(filePath);
-
-    auto it = m_translationUnits.find(filePath);
-    if (it != m_translationUnits.end())
-    {
-        clang_disposeTranslationUnit(it->second.tu);
-        clang_disposeIndex(it->second.index);
-        m_translationUnits.erase(it);
-    }
-}
-
-void Completion::SetTranslationOptions(const std::vector<std::string> &options)
-{
-    m_args.clear();
-
-    for (const auto &arg : options)
-    {
-        m_args.push_back(arg);
-    }
-
-    if (m_headersDir)
-    {
-        m_args.push_back("-I" + m_headersDir.value().string());
-        const auto &headers = resources::get_headers();
-        for (const auto &[filename, _] : headers)
-        {
-            m_args.push_back("-include");
-            m_args.push_back(filename);
-        }
-    }
-
-    logger()->debug("Completion::SetTranslationOptions - {}", utils::FormatVector(m_args));
-
-    // We need to re-parse sources with new options
-    DestroyTranslationUnits();
-}
 
 std::optional<std::string> Completion::GetPrefix(
     const CXTranslationUnit &translationUnit,
@@ -699,23 +456,16 @@ std::vector<CompletionResult> Completion::GetCompletions(
     const std::string &filePath, unsigned lineno, unsigned columnno)
 {
     logger()->debug("Get completions for {}:{}:{}", filePath, lineno, columnno);
-    // Look up cached TU
-    auto tuIt = m_translationUnits.find(filePath);
-    if (tuIt == m_translationUnits.end())
+
+    CXTranslationUnit translationUnit = m_store->GetTranslationUnit(filePath);
+    if (!translationUnit)
     {
         logger()->error("No translation unit for {}", filePath);
         return {};
     }
-    CXTranslationUnit translationUnit = tuIt->second.tu;
 
-    // Look up cached content
-    auto contentIt = m_fileContents.find(filePath);
-    const std::string *contentPtr = nullptr;
-    if (contentIt != m_fileContents.end())
-    {
-        contentPtr = &contentIt->second;
-    }
-    else
+    const std::string *contentPtr = m_store->GetContent(filePath);
+    if (!contentPtr)
     {
         logger()->error("Content is not available for {}", filePath);
         return {};
@@ -728,7 +478,6 @@ std::vector<CompletionResult> Completion::GetCompletions(
         logger()->error("Unable to get prefix under cursor in {}", filePath);
         return {};
     }
-
 
     CXUnsavedFile unsavedFile;
     unsavedFile.Filename = filePath.c_str();
@@ -756,30 +505,9 @@ std::vector<CompletionResult> Completion::GetCompletions(
     return completions;
 }
 
-
-std::shared_ptr<ICompletion> CreateCompletion()
+std::shared_ptr<ICompletion> CreateCompletion(std::shared_ptr<ITranslationUnitStore> store)
 {
-    return std::make_shared<Completion>();
-}
-
-std::vector<std::string> BuildDefaultTranslationOptions(const std::string &clStandard)
-{
-    std::vector<std::string> options;
-    options.push_back("-x");
-    options.push_back("cl");
-    if (!clStandard.empty())
-    {
-        options.push_back("-cl-std=" + clStandard);
-    }
-    return options;
-}
-
-std::string GetClangVersion()
-{
-    auto clangVersion = clang_getClangVersion();
-    std::string result(clang_getCString(clangVersion));
-    clang_disposeString(clangVersion);
-    return result;
+    return std::make_shared<Completion>(std::move(store));
 }
 
 } // namespace ocls

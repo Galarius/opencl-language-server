@@ -59,8 +59,9 @@ class LSPServer final
     , public std::enable_shared_from_this<LSPServer>
 {
 public:
-    LSPServer(std::shared_ptr<IJsonRPC> jrpc, std::shared_ptr<ILSPServerEventsHandler> handler)
+    LSPServer(std::shared_ptr<IJsonRPC> jrpc, std::shared_ptr<ITranslationUnitStore> store, std::shared_ptr<ILSPServerEventsHandler> handler)
         : m_jrpc {std::move(jrpc)}
+        , m_store {std::move(store)}
         , m_handler {std::move(handler)}
     {}
 
@@ -83,6 +84,7 @@ private:
 
 private:
     std::shared_ptr<IJsonRPC> m_jrpc;
+    std::shared_ptr<ITranslationUnitStore> m_store;
     std::shared_ptr<ILSPServerEventsHandler> m_handler;
     std::atomic<bool> m_interrupted = {false};
 };
@@ -92,11 +94,13 @@ class LSPServerEventsHandler final : public ILSPServerEventsHandler
 public:
     LSPServerEventsHandler(
         std::shared_ptr<IJsonRPC> jrpc,
+        std::shared_ptr<ITranslationUnitStore> store,
         std::shared_ptr<IDiagnostics> diagnostics,
         std::shared_ptr<ICompletion> completion,
         std::shared_ptr<utils::IGenerator> generator,
         std::shared_ptr<utils::IExitHandler> exitHandler)
         : m_jrpc {std::move(jrpc)}
+        , m_store {std::move(store)}
         , m_diagnostics {std::move(diagnostics)}
         , m_completion {std::move(completion)}
         , m_generator {std::move(generator)}
@@ -127,6 +131,7 @@ private:
 
 private:
     std::shared_ptr<IJsonRPC> m_jrpc;
+    std::shared_ptr<ITranslationUnitStore> m_store;
     std::shared_ptr<IDiagnostics> m_diagnostics;
     std::shared_ptr<ICompletion> m_completion;
     std::shared_ptr<utils::IGenerator> m_generator;
@@ -179,7 +184,7 @@ void LSPServerEventsHandler::ConfigureCompletion()
     auto device = m_diagnostics->GetDevice();
     auto clStandard = device ? device->GetCLStandard() : "CL";
     auto options = BuildDefaultTranslationOptions(clStandard);
-    m_completion->SetTranslationOptions(options);
+    m_store->SetTranslationOptions(options);
 }
 
 void LSPServerEventsHandler::OnInitialize(const json &data)
@@ -365,7 +370,7 @@ void LSPServerEventsHandler::OnTextOpen(const json &data)
         const auto filePath = utils::UriToFilePath(uri);
         const auto content = contentParam->get<std::string>();
         logger()->trace("'{}' -> '{}'", uri, filePath);
-        m_completion->OnFileOpen(filePath, content);
+        m_store->OnFileOpen(filePath, content);
         BuildDiagnosticsRespond(uri, filePath, content);
     }
 }
@@ -386,7 +391,7 @@ void LSPServerEventsHandler::OnTextChanged(const json &data)
             const auto uri = uriParam->get<std::string>();
             const auto filePath = utils::UriToFilePath(uri);
             logger()->trace("'{}' -> '{}'", uri, filePath);
-            m_completion->OnFileChange(filePath, text);
+            m_store->OnFileChange(filePath, text);
             BuildDiagnosticsRespond(uri, filePath, text);
         }
     }
@@ -401,7 +406,7 @@ void LSPServerEventsHandler::OnTextClose(const json &data)
         const auto uri = uriParam->get<std::string>();
         const auto filePath = utils::UriToFilePath(uri);
         logger()->trace("'{}' -> '{}'", uri, filePath);
-        m_completion->OnFileClose(filePath);
+        m_store->OnFileClose(filePath);
     }
 }
 
@@ -642,27 +647,42 @@ void LSPServer::Interrupt()
 
 std::shared_ptr<ILSPServerEventsHandler> CreateLSPEventsHandler(
     std::shared_ptr<IJsonRPC> jrpc,
+    std::shared_ptr<ITranslationUnitStore> store,
     std::shared_ptr<IDiagnostics> diagnostics,
     std::shared_ptr<ICompletion> completion,
     std::shared_ptr<utils::IGenerator> generator,
     std::shared_ptr<utils::IExitHandler> exitHandler)
 {
-    return std::make_shared<LSPServerEventsHandler>(jrpc, diagnostics, completion, generator, exitHandler);
+    return std::make_shared<LSPServerEventsHandler>(std::move(jrpc), std::move(store), std::move(diagnostics), std::move(completion), std::move(generator), std::move(exitHandler));
 }
 
 std::shared_ptr<ILSPServer> CreateLSPServer(
-    std::shared_ptr<IJsonRPC> jrpc, std::shared_ptr<ILSPServerEventsHandler> handler)
+    std::shared_ptr<IJsonRPC> jrpc, std::shared_ptr<ITranslationUnitStore> store, std::shared_ptr<ILSPServerEventsHandler> handler)
 {
-    return std::make_shared<LSPServer>(std::move(jrpc), std::move(handler));
+    return std::make_shared<LSPServer>(std::move(jrpc), std::move(store), std::move(handler));
 }
 
 std::shared_ptr<ILSPServer> CreateLSPServer(
-    std::shared_ptr<IJsonRPC> jrpc, std::shared_ptr<IDiagnostics> diagnostics, std::shared_ptr<ICompletion> completion)
+    std::shared_ptr<IJsonRPC> jrpc, 
+    std::shared_ptr<ITranslationUnitStore> store, 
+    std::shared_ptr<IDiagnostics> diagnostics, 
+    std::shared_ptr<ICompletion> completion)
 {
     auto generator = utils::CreateDefaultGenerator();
     auto exitHandler = utils::CreateDefaultExitHandler();
-    auto handler = std::make_shared<LSPServerEventsHandler>(jrpc, diagnostics, completion, generator, exitHandler);
-    return std::make_shared<LSPServer>(std::move(jrpc), std::move(handler));
+    auto handler = std::make_shared<LSPServerEventsHandler>(
+        jrpc, 
+        store, 
+        std::move(diagnostics), 
+        std::move(completion), 
+        std::move(generator), 
+        std::move(exitHandler)
+    );
+    return std::make_shared<LSPServer>(
+        std::move(jrpc), 
+        std::move(store), 
+        std::move(handler)
+    );
 }
 
 } // namespace ocls

@@ -6,6 +6,7 @@
 //
 
 #include "completion.hpp"
+#include "translation.hpp"
 #include "log.hpp"
 
 #include <gtest/gtest.h>
@@ -28,23 +29,28 @@ class CompletionTest : public ::testing::Test
 {
 protected:
     std::shared_ptr<ICompletion> completion;
+    std::shared_ptr<ITranslationUnitStore> store;
+    std::string fileContent;
+    CXTranslationUnit dummyTU{nullptr};
+    CXCursor dummyCursor{};
 
     void SetUp() override
     {
-        std::string content;
         std::ifstream f(KERNEL_FILE);
         if (f.is_open())
         {
-            content.assign(std::istreambuf_iterator<char>(f), std::istreambuf_iterator<char>());
+            fileContent.assign(std::istreambuf_iterator<char>(f), std::istreambuf_iterator<char>());
         }
-        completion = CreateCompletion();
-        completion->SetTranslationOptions({});
-        completion->OnFileOpen(KERNEL_FILE, content);
+        store = CreateTranslationUnitStore();
+        store->SetTranslationOptions({});
+        store->SetTranslationOptions({});
+        store->OnFileOpen(KERNEL_FILE, fileContent);
+        completion = CreateCompletion(store);
     }
-
+    
     void TearDown() override
     {
-        completion->OnFileClose(KERNEL_FILE);
+        store->OnFileClose(KERNEL_FILE);
     }
 };
 

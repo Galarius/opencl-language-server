@@ -191,10 +191,11 @@ struct CompletionSubCommand final : public SubCommand
     {
         try
         {
-            auto completion = CreateCompletion();
             auto options = BuildDefaultTranslationOptions(clVersion);
-            completion->SaveHeaders();
-            completion->SetTranslationOptions(options);
+            auto store = CreateTranslationUnitStore();
+            store->SaveHeaders();
+            store->SetTranslationOptions(options);
+            auto completion = CreateCompletion(store);
 
             if (!fs::exists(kernel))
             {
@@ -207,9 +208,9 @@ struct CompletionSubCommand final : public SubCommand
             {
                 return EXIT_FAILURE;
             }
-            completion->OnFileOpen(kernel, *content);
+            store->OnFileOpen(kernel, *content);
             auto completions = completion->GetCompletions(kernel, line, column);
-            completion->OnFileClose(kernel);
+            store->OnFileClose(kernel);
 
             if (json)
             {
@@ -394,14 +395,14 @@ int main(int argc, char* argv[])
         std::signal(SIGINT, SignalHandler);
 
         auto jrpc = CreateJsonRPC();
-
         auto device = diagnostics->GetDevice();
         auto clStandard = device ? device->GetCLStandard() : "CL";
         auto options = BuildDefaultTranslationOptions(clStandard);
-        auto completion = CreateCompletion();
-        completion->SaveHeaders();
-        completion->SetTranslationOptions(options);
-        server = CreateLSPServer(jrpc, diagnostics, completion);
+        auto store = CreateTranslationUnitStore();
+        auto completion = CreateCompletion(store);
+        store->SaveHeaders();
+        store->SetTranslationOptions(options);
+        server = CreateLSPServer(jrpc, store, diagnostics, completion);
         result = server->Run();
     } while (false);
 
