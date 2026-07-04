@@ -21,6 +21,7 @@ struct LogName
     static std::string diagnostics;
     static std::string completion;
     static std::string definition;
+    static std::string typeDefinition;
     static std::string jrpc;
     static std::string lsp;
 };

@@ -24,9 +24,9 @@ namespace {
 
 const std::string TEST_FIXTURE_DIR = fs::path(__FILE__).parent_path().string() + "/fixtures";
 const std::string KERNEL_FILE = TEST_FIXTURE_DIR + "/kernel.cl";
-// Line 62: "            p = get"
+// Line 79: "            p = get"
 // Position 20 is after "get" to trigger completion for getChannel
-const unsigned line = 62;
+const unsigned line = 79;
 const unsigned column = 20;
 
 class CompletionTest : public ::testing::Test

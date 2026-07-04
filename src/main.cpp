@@ -13,6 +13,7 @@
 #include "clinfo.hpp"
 #include "completion.hpp"
 #include "definition.hpp"
+#include "typedef.hpp"
 #include "diagnostics.hpp"
 #include "jsonrpc.hpp"
 #include "log.hpp"
@@ -388,6 +389,100 @@ private:
     bool json = false;
 };
 
+struct TypeDefinitionSubCommand final : public SubCommand
+{
+    TypeDefinitionSubCommand(CLI::App& app)
+        : SubCommand(
+              app, "typedef", "Resolve the type definition location of a symbol at a given text document position")
+    {
+        cmd->add_flag("-j,--json", json, "Print diagnostics in JSON format");
+        cmd->add_option("-k,--kernel", kernel, "Path to a kernel file")->required(true);
+
+        // https://clang.llvm.org/docs/ClangCommandLineReference.html
+        cmd->add_option("--cl-std", clVersion, "OpenCL version")
+            ->check(CLI::IsMember(clVersions))
+            ->required(true)
+            ->capture_default_str();
+        cmd->add_option("-l,--line", line, "line number (1-based)")->required(true)->capture_default_str();
+        cmd->add_option("-c,--column", column, "column number (1-based)")->required(true)->capture_default_str();
+    }
+
+    int Execute()
+    {
+        try
+        {
+            auto options = BuildDefaultTranslationOptions(clVersion);
+            auto store = CreateTranslationUnitStore();
+            store->SaveHeaders();
+            store->SetTranslationOptions(options);
+            auto typeDefinition = CreateTypeDefinition(store);
+
+            if (!fs::exists(kernel))
+            {
+                std::cerr << "Kernel file does not exist" << std::endl;
+                return EXIT_FAILURE;
+            }
+
+            auto content = utils::ReadFileContent(kernel);
+            if (!content.has_value())
+            {
+                return EXIT_FAILURE;
+            }
+            store->OnFileOpen(kernel, *content);
+            auto typeDefinitions = typeDefinition->GetTypeDefinitions(kernel, line, column);
+            store->OnFileClose(kernel);
+
+            if (json)
+            {
+                nlohmann::json typeDefinitionItems = nlohmann::json::array();
+                for (const auto& item : typeDefinitions)
+                {
+                    typeDefinitionItems.emplace_back(item.toJson(true));
+                }
+                std::cout << typeDefinitionItems.dump(4) << std::endl;
+            }
+            else
+            {
+                std::cout << "#" << ", "
+                          << "uri" << ", "
+                          << "startLine" << ", "
+                          << "startColumn" << ", "
+                          << "endLine" << ", "
+                          << "endColumn" << ", "
+                          << "selStartLine" << ", "
+                          << "selStartColumn" << ", "
+                          << "selEndLine" << ", "
+                          << "selEndColumn" << std::endl;
+
+                int index = 1;
+
+                for (auto& item : typeDefinitions)
+                {
+                    std::cout << index++ << ", " << item.uri << ", " << item.startLine << ", " << item.startColumn
+                              << ", " << item.endLine << ", " << item.endColumn << ", " << item.selStartLine << ", "
+                              << item.selStartColumn << ", " << item.selEndLine << ", " << item.selEndColumn
+                              << std::endl;
+                }
+                std::cout << std::endl;
+            }
+        }
+        catch (std::exception& err)
+        {
+            std::cerr << "Failed to get type definition: " << err.what() << std::endl;
+            return EXIT_FAILURE;
+        }
+
+        return EXIT_SUCCESS;
+    }
+
+private:
+    std::string kernel;
+    uint32_t line = 0;
+    uint32_t column = 0;
+    std::string clVersion;
+    bool json = false;
+};
+
 std::shared_ptr<ILSPServer> server;
 
 static void SignalHandler(int)
@@ -453,6 +548,7 @@ int main(int argc, char* argv[])
     DiagnosticsSubCommand diagnosticsCmd(app);
     CompletionSubCommand completionCmd(app);
     DefinitionSubCommand definitionCmd(app);
+    TypeDefinitionSubCommand typeDefinitionCmd(app);
     CLI11_PARSE(app, argc, argv);
     if (flagLogTofile)
     {
@@ -494,6 +590,11 @@ int main(int argc, char* argv[])
             return definitionCmd.Execute();
         }
 
+        if (typeDefinitionCmd.IsParsed())
+        {
+            return typeDefinitionCmd.Execute();
+        }
+
         SetupBinaryStreamMode();
         std::signal(SIGINT, SignalHandler);
 
@@ -504,9 +605,10 @@ int main(int argc, char* argv[])
         auto store = CreateTranslationUnitStore();
         auto completion = CreateCompletion(store);
         auto definition = CreateDefinition(store);
+        auto typeDefinition = CreateTypeDefinition(store);
         store->SaveHeaders();
         store->SetTranslationOptions(options);
-        server = CreateLSPServer(jrpc, store, diagnostics, completion, definition);
+        server = CreateLSPServer(jrpc, store, diagnostics, completion, definition, typeDefinition);
         result = server->Run();
     } while (false);
 

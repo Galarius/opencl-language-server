@@ -7,6 +7,7 @@ set(sources
     utils.cpp
     completion.cpp
     definition.cpp
+    typedef.cpp
     translation.cpp
     location.cpp
 )
@@ -17,6 +18,7 @@ set(test_sources
     diagnostics-tests.cpp
     completion-tests.cpp
     definition-tests.cpp
+    typedef-tests.cpp
     lsp-event-handler-tests.cpp
     utils-tests.cpp
     main.cpp

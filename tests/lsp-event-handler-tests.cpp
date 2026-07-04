@@ -13,6 +13,7 @@
 #include "diagnostics-mock.hpp"
 #include "completion-mock.hpp"
 #include "definition-mock.hpp"
+#include "typedef-mock.hpp"
 #include "generator-mock.hpp"
 
 #include <gtest/gtest.h>
@@ -32,6 +33,7 @@ protected:
     std::shared_ptr<DiagnosticsMock> mockDiagnostics;
     std::shared_ptr<CompletionMock> mockCompletion;
     std::shared_ptr<DefinitionMock> mockDefinition;
+    std::shared_ptr<TypeDefinitionMock> mockTypeDefinition;
     std::shared_ptr<GeneratorMock> mockGenerator;
     std::shared_ptr<ExitHandlerMock> mockExitHandler;
     std::shared_ptr<ILSPServerEventsHandler> handler;
@@ -43,6 +45,7 @@ protected:
         mockDiagnostics = std::make_shared<DiagnosticsMock>();
         mockCompletion = std::make_shared<CompletionMock>();
         mockDefinition = std::make_shared<DefinitionMock>();
+        mockTypeDefinition = std::make_shared<TypeDefinitionMock>();
         mockGenerator = std::make_shared<GeneratorMock>();
         mockExitHandler = std::make_shared<ExitHandlerMock>();
 
@@ -51,7 +54,7 @@ protected:
         ON_CALL(*mockGenerator, GenerateID()).WillByDefault(::testing::Return("12345678"));
         ON_CALL(*mockDiagnostics, GetDevice()).WillByDefault(::testing::Return(device));
 
-        handler = CreateLSPEventsHandler(mockJsonRPC, mockStore, mockDiagnostics, mockCompletion, mockDefinition, mockGenerator, mockExitHandler);
+        handler = CreateLSPEventsHandler(mockJsonRPC, mockStore, mockDiagnostics, mockCompletion, mockDefinition, mockTypeDefinition, mockGenerator, mockExitHandler);
     }
 
     std::tuple<std::string, std::string> GetTestSource() const
@@ -141,7 +144,8 @@ TEST_F(LSPTest, OnInitialize_shouldBuildResponse_andCallDiagnosticsSetters)
                     "resolveProvider": true,
                     "triggerCharacters": [".", ":"]
                 },
-                "definitionProvider": true
+                "definitionProvider": true,
+                "typeDefinitionProvider": true
             }
         }
     })"_json;
@@ -193,7 +197,8 @@ TEST_F(LSPTest, OnInitialize_withMissingConfigurationFields_shouldBuildResponse_
                     "resolveProvider": true,
                     "triggerCharacters": [".", ":"]
                 },
-                "definitionProvider": true
+                "definitionProvider": true,
+                "typeDefinitionProvider": true
             }
         }
     })"_json;

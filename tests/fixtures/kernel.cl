@@ -3,7 +3,10 @@
   \brief Perona – Malik Anisotropic Filter
 */
 
+typedef struct { float r, g, b; } Color;
+
 int getChannel(uint rgb, int channel);
+Color getColor(uint rgb);
 float quadric(int norm, float thresh);
 float exponential(int norm, float thresh);
 
@@ -29,6 +32,20 @@ int getChannel(uint rgb, int channel)
             return PM_BLUE(rgb);
     }
     return 0;
+}
+
+/**
+ * \brief Splits an RGB value into its individual color channels.
+ * \param rgb The packed RGB value.
+ * \return A Color struct with r, g, b fields populated.
+ */
+Color getColor(uint rgb)
+{
+    Color color;
+    color.r = PM_RED(rgb);
+    color.g = PM_GREEN(rgb);
+    color.b = PM_BLUE(rgb);
+    return color;
 }
 
 float quadric(int norm, float thresh)

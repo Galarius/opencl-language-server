@@ -52,7 +52,8 @@ struct Capabilities
 {
     bool hasConfigurationCapability = false;
     bool supportDidChangeConfiguration = false;
-    bool hasLinkSupport = false;
+    bool hasDefinitionLinkSupport = false;
+    bool hasTypeDefinitionLinkSupport = false;
 };
 
 class LSPServer final
@@ -99,6 +100,7 @@ public:
         std::shared_ptr<IDiagnostics> diagnostics,
         std::shared_ptr<ICompletion> completion,
         std::shared_ptr<IDefinition> definition,
+        std::shared_ptr<ITypeDefinition> typeDefinition,
         std::shared_ptr<utils::IGenerator> generator,
         std::shared_ptr<utils::IExitHandler> exitHandler)
         : m_jrpc {std::move(jrpc)}
@@ -106,12 +108,13 @@ public:
         , m_diagnostics {std::move(diagnostics)}
         , m_completion {std::move(completion)}
         , m_definition {std::move(definition)}
+        , m_typeDefinition {std::move(typeDefinition)}
         , m_generator {std::move(generator)}
         , m_exitHandler {std::move(exitHandler)}
     {}
 
     void BuildDiagnosticsRespond(const std::string &uri, const std::string &filePath, const std::string &content);
-    nlohmann::json BuildDefinitionRespond(const json &data);
+    nlohmann::json BuildDefinitionRespond(const json &data, bool typeDefinition);
     void BuildCompletionRespond(const json &data);
     void ResolveCompletion(const json &data);
 
@@ -123,6 +126,7 @@ public:
     void OnTextChanged(const json &data);
     void OnTextClose(const json &data);
     void OnDefinition(const json &data);
+    void OnTypeDefinition(const json &data);
     void OnCompletion(const json &data);
     void OnResolveCompletion(const json &data);
     void OnConfiguration(const json &data);
@@ -140,6 +144,7 @@ private:
     std::shared_ptr<IDiagnostics> m_diagnostics;
     std::shared_ptr<ICompletion> m_completion;
     std::shared_ptr<IDefinition> m_definition;
+    std::shared_ptr<ITypeDefinition> m_typeDefinition;
     std::shared_ptr<utils::IGenerator> m_generator;
     std::shared_ptr<utils::IExitHandler> m_exitHandler;
     std::queue<json> m_outQueue;
@@ -216,10 +221,16 @@ void LSPServerEventsHandler::OnInitialize(const json &data)
         m_capabilities.supportDidChangeConfiguration = didChangeConfiguration->get<bool>();
     }
 
-    auto hasLinkSupport = GetNestedValue(data, {"params", "capabilities", "textDocument", "definition", "linkSupport"});
-    if (hasLinkSupport)
+    auto hasDefinitionLinkSupport = GetNestedValue(data, {"params", "capabilities", "textDocument", "definition", "linkSupport"});
+    auto hasTypeDefinitionLinkSupport = GetNestedValue(data, {"params", "capabilities", "textDocument", "typeDefinition", "linkSupport"});
+    
+    if (hasDefinitionLinkSupport)
     {
-        m_capabilities.hasLinkSupport = hasLinkSupport->get<bool>();
+        m_capabilities.hasDefinitionLinkSupport = hasDefinitionLinkSupport->get<bool>();
+    }
+    if (hasTypeDefinitionLinkSupport)
+    {
+        m_capabilities.hasTypeDefinitionLinkSupport = hasTypeDefinitionLinkSupport->get<bool>();
     }
 
     auto configuration = GetNestedValue(data, {"params", "initializationOptions", "configuration"});
@@ -257,7 +268,8 @@ void LSPServerEventsHandler::OnInitialize(const json &data)
              {"resolveProvider", true}, 
              {"triggerCharacters", {".", ":"}}
          }},
-         {"definitionProvider", true}
+         {"definitionProvider", true},
+         {"typeDefinitionProvider", true}
     };
 
     m_outQueue.push({{"id", requestId}, {"result", {{"capabilities", capabilities}}}});
@@ -307,7 +319,7 @@ void LSPServerEventsHandler::BuildDiagnosticsRespond(
     }
 }
 
-nlohmann::json LSPServerEventsHandler::BuildDefinitionRespond(const json &data)
+nlohmann::json LSPServerEventsHandler::BuildDefinitionRespond(const json &data, bool typeDefinition)
 {
     nlohmann::json result = nlohmann::json::array();
     try
@@ -318,16 +330,18 @@ nlohmann::json LSPServerEventsHandler::BuildDefinitionRespond(const json &data)
         if (uri && character && line)
         {
             const auto filePath = utils::UriToFilePath(*uri);
-            const unsigned lineno = static_cast<unsigned>(*line);
-            const unsigned columnno = static_cast<unsigned>(*character);
-            
             // Convert zero-based values to one-based
-            auto targets = m_definition->GetDefinitions(filePath, lineno + 1, columnno + 1);
+            const unsigned lineno = static_cast<unsigned>(*line) + 1;
+            const unsigned columnno = static_cast<unsigned>(*character) + 1;
+            auto targets = typeDefinition 
+                         ? m_typeDefinition->GetTypeDefinitions(filePath, lineno, columnno) 
+                         : m_definition->GetDefinitions(filePath, lineno, columnno);
+            const bool hasLinkSupport = typeDefinition ? m_capabilities.hasTypeDefinitionLinkSupport : m_capabilities.hasDefinitionLinkSupport;
             for (const auto &target : targets) {
                 // a. LocationLink — richer, includes target's full range + narrow selection range
                 // b. Location — the pre-3.14 plain form; use the narrow selection
                 //    range since plain Location has no room for a separate full range.
-                result.push_back(target.toJson(m_capabilities.hasLinkSupport));
+                result.emplace_back(target.toJson(hasLinkSupport));
             }
         }
     }
@@ -464,7 +478,14 @@ void LSPServerEventsHandler::OnTextClose(const json &data)
 void LSPServerEventsHandler::OnDefinition(const json &data)
 {
     logger()->trace("Received 'definition' message");
-    nlohmann::json result = BuildDefinitionRespond(data);
+    nlohmann::json result = BuildDefinitionRespond(data, false);
+    m_outQueue.push({{"id", data["id"]}, {"result", result}});
+}
+
+void LSPServerEventsHandler::OnTypeDefinition(const json &data)
+{
+    logger()->trace("Received 'typeDefinition' message");
+    nlohmann::json result = BuildDefinitionRespond(data, true);
     m_outQueue.push({{"id", data["id"]}, {"result", result}});
 }
 
@@ -643,6 +664,10 @@ int LSPServer::Run()
     {
         self->m_handler->OnDefinition(request);
     });
+    m_jrpc->RegisterMethodCallback("textDocument/typeDefinition", [self](const json &request)
+    {
+        self->m_handler->OnTypeDefinition(request);
+    });
     m_jrpc->RegisterMethodCallback("textDocument/completion", [self](const json &request)
     {
         self->m_handler->OnCompletion(request);
@@ -713,10 +738,11 @@ std::shared_ptr<ILSPServerEventsHandler> CreateLSPEventsHandler(
     std::shared_ptr<IDiagnostics> diagnostics,
     std::shared_ptr<ICompletion> completion,
     std::shared_ptr<IDefinition> definition,
+    std::shared_ptr<ITypeDefinition> typeDefinition,
     std::shared_ptr<utils::IGenerator> generator,
     std::shared_ptr<utils::IExitHandler> exitHandler)
 {
-    return std::make_shared<LSPServerEventsHandler>(std::move(jrpc), std::move(store), std::move(diagnostics), std::move(completion), std::move(definition), std::move(generator), std::move(exitHandler));
+    return std::make_shared<LSPServerEventsHandler>(std::move(jrpc), std::move(store), std::move(diagnostics), std::move(completion), std::move(definition), std::move(typeDefinition), std::move(generator), std::move(exitHandler));
 }
 
 std::shared_ptr<ILSPServer> CreateLSPServer(
@@ -730,7 +756,8 @@ std::shared_ptr<ILSPServer> CreateLSPServer(
     std::shared_ptr<ITranslationUnitStore> store, 
     std::shared_ptr<IDiagnostics> diagnostics, 
     std::shared_ptr<ICompletion> completion,
-    std::shared_ptr<IDefinition> definition)
+    std::shared_ptr<IDefinition> definition,
+    std::shared_ptr<ITypeDefinition> typeDefinition)
 {
     auto generator = utils::CreateDefaultGenerator();
     auto exitHandler = utils::CreateDefaultExitHandler();
@@ -740,6 +767,7 @@ std::shared_ptr<ILSPServer> CreateLSPServer(
         std::move(diagnostics), 
         std::move(completion),
         std::move(definition),
+        std::move(typeDefinition),
         std::move(generator),
         std::move(exitHandler)
     );

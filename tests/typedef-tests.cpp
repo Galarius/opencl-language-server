@@ -1,11 +1,11 @@
 //
-//  definition-tests.hpp
+//  typedef-tests.hpp
 //  opencl-language-server-tests
 //
 //  Created by Ilia Shoshin on 7/04/26.
 //
 
-#include "definition.hpp"
+#include "typedef.hpp"
 #include "translation.hpp"
 #include "log.hpp"
 
@@ -24,14 +24,14 @@ namespace {
 
 const std::string TEST_FIXTURE_DIR = fs::path(__FILE__).parent_path().string() + "/fixtures";
 const std::string KERNEL_FILE = TEST_FIXTURE_DIR + "/kernel.cl";
-// Line 8: "int getChannel(uint rgb, int channel);"
-const unsigned line = 8;
-const unsigned column = 8;
+// Line 48: "    return color;"
+const unsigned line = 48;
+const unsigned column = 14;
 
-class DefinitionTest : public ::testing::Test
+class TypeDefinitionTest : public ::testing::Test
 {
 protected:
-    std::shared_ptr<IDefinition> definition;
+    std::shared_ptr<ITypeDefinition> typeDefinition;
     std::shared_ptr<ITranslationUnitStore> store;
 
     void SetUp() override
@@ -44,9 +44,9 @@ protected:
         }
         auto options = BuildDefaultTranslationOptions("cl1.2");
         store = CreateTranslationUnitStore();
-        store->SaveHeaders(); // without opencl-c.h, the 'GetDefinitions' cascades into broken cursor resolution
+        store->SaveHeaders(); // without opencl-c.h, the 'GetTypeDefinitions' cascades into broken cursor resolution
         store->SetTranslationOptions(options);
-        definition = CreateDefinition(store);
+        typeDefinition = CreateTypeDefinition(store);
         
         store->OnFileOpen(KERNEL_FILE, fileContent);
     }
@@ -60,19 +60,19 @@ protected:
 } // namespace
 
 // Test basic definition at a function call site
-TEST_F(DefinitionTest, DefinitionAtFunctionCall)
+TEST_F(TypeDefinitionTest, TypeDefinitionAtFunctionCall)
 {
-    auto results = definition->GetDefinitions(KERNEL_FILE, line, column);
+    auto results = typeDefinition->GetTypeDefinitions(KERNEL_FILE, line, column);
     ASSERT_GT(results.size(), 0);
 
     auto r = results.front();
     ASSERT_EQ(r.uri, KERNEL_FILE);
-    ASSERT_EQ(r.startLine, 23);
-    ASSERT_EQ(r.startColumn, 0);
-    ASSERT_EQ(r.endLine, 34);
-    ASSERT_EQ(r.endColumn, 1);
-    ASSERT_EQ(r.selStartLine, 23);
-    ASSERT_EQ(r.selStartColumn, 4);
-    ASSERT_EQ(r.selEndLine, 23);
-    ASSERT_EQ(r.selEndColumn, 14);
+    ASSERT_EQ(r.startLine, 5);
+    ASSERT_EQ(r.startColumn, 8);
+    ASSERT_EQ(r.endLine, 5);
+    ASSERT_EQ(r.endColumn, 33);
+    ASSERT_EQ(r.selStartLine, 5);
+    ASSERT_EQ(r.selStartColumn, 8);
+    ASSERT_EQ(r.selEndLine, 5);
+    ASSERT_EQ(r.selEndColumn, 13);
 }
