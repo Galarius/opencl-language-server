@@ -14,6 +14,7 @@
 #include "completion-mock.hpp"
 #include "definition-mock.hpp"
 #include "typedef-mock.hpp"
+#include "declaration-mock.hpp"
 #include "generator-mock.hpp"
 
 #include <gtest/gtest.h>
@@ -34,6 +35,7 @@ protected:
     std::shared_ptr<CompletionMock> mockCompletion;
     std::shared_ptr<DefinitionMock> mockDefinition;
     std::shared_ptr<TypeDefinitionMock> mockTypeDefinition;
+    std::shared_ptr<DeclarationMock> mockDeclaration;
     std::shared_ptr<GeneratorMock> mockGenerator;
     std::shared_ptr<ExitHandlerMock> mockExitHandler;
     std::shared_ptr<ILSPServerEventsHandler> handler;
@@ -46,6 +48,7 @@ protected:
         mockCompletion = std::make_shared<CompletionMock>();
         mockDefinition = std::make_shared<DefinitionMock>();
         mockTypeDefinition = std::make_shared<TypeDefinitionMock>();
+        mockDeclaration = std::make_shared<DeclarationMock>();
         mockGenerator = std::make_shared<GeneratorMock>();
         mockExitHandler = std::make_shared<ExitHandlerMock>();
 
@@ -54,7 +57,7 @@ protected:
         ON_CALL(*mockGenerator, GenerateID()).WillByDefault(::testing::Return("12345678"));
         ON_CALL(*mockDiagnostics, GetDevice()).WillByDefault(::testing::Return(device));
 
-        handler = CreateLSPEventsHandler(mockJsonRPC, mockStore, mockDiagnostics, mockCompletion, mockDefinition, mockTypeDefinition, mockGenerator, mockExitHandler);
+        handler = CreateLSPEventsHandler(mockJsonRPC, mockStore, mockDiagnostics, mockCompletion, mockDefinition, mockTypeDefinition, mockDeclaration, mockGenerator, mockExitHandler);
     }
 
     std::tuple<std::string, std::string> GetTestSource() const
@@ -145,7 +148,8 @@ TEST_F(LSPTest, OnInitialize_shouldBuildResponse_andCallDiagnosticsSetters)
                     "triggerCharacters": [".", ":"]
                 },
                 "definitionProvider": true,
-                "typeDefinitionProvider": true
+                "typeDefinitionProvider": true,
+                "declarationProvider": true
             }
         }
     })"_json;
@@ -198,7 +202,8 @@ TEST_F(LSPTest, OnInitialize_withMissingConfigurationFields_shouldBuildResponse_
                     "triggerCharacters": [".", ":"]
                 },
                 "definitionProvider": true,
-                "typeDefinitionProvider": true
+                "typeDefinitionProvider": true,
+                "declarationProvider": true
             }
         }
     })"_json;

@@ -10,6 +10,7 @@
 #include <memory>
 #include <optional>
 
+#include "declaration.hpp"
 #include "typedef.hpp"
 #include "definition.hpp"
 #include "completion.hpp"
@@ -35,6 +36,7 @@ struct ILSPServerEventsHandler
     virtual void BuildDiagnosticsRespond(
         const std::string &uri, const std::string &filePath, const std::string &content) = 0;
     virtual nlohmann::json BuildDefinitionRespond(const json &data, bool typeDefinition) = 0;
+    virtual nlohmann::json BuildDeclarationRespond(const json &data) = 0;
     virtual void BuildCompletionRespond(const json &data) = 0;
     virtual void ResolveCompletion(const json &data) = 0;
 
@@ -47,6 +49,7 @@ struct ILSPServerEventsHandler
     virtual void OnTextClose(const nlohmann::json &data) = 0;
     virtual void OnDefinition(const nlohmann::json &data) = 0;
     virtual void OnTypeDefinition(const nlohmann::json &data) = 0;
+    virtual void OnDeclaration(const nlohmann::json &data) = 0;
     virtual void OnCompletion(const nlohmann::json &data) = 0;
     virtual void OnResolveCompletion(const nlohmann::json &data) = 0;
     virtual void OnConfiguration(const nlohmann::json &data) = 0;
@@ -63,6 +66,7 @@ std::shared_ptr<ILSPServerEventsHandler> CreateLSPEventsHandler(
     std::shared_ptr<ICompletion> completion,
     std::shared_ptr<IDefinition> definition,
     std::shared_ptr<ITypeDefinition> typeDefinition,
+    std::shared_ptr<IDeclaration> declaration,
     std::shared_ptr<utils::IGenerator> generator,
     std::shared_ptr<utils::IExitHandler> exitHandler);
 
@@ -70,6 +74,6 @@ std::shared_ptr<ILSPServer> CreateLSPServer(
     std::shared_ptr<IJsonRPC> jrpc, std::shared_ptr<ITranslationUnitStore> store, std::shared_ptr<ILSPServerEventsHandler> handler);
 
 std::shared_ptr<ILSPServer> CreateLSPServer(
-    std::shared_ptr<IJsonRPC> jrpc, std::shared_ptr<ITranslationUnitStore> store, std::shared_ptr<IDiagnostics> diagnostics, std::shared_ptr<ICompletion> completion, std::shared_ptr<IDefinition> definition, std::shared_ptr<ITypeDefinition> typeDefinition);
+    std::shared_ptr<IJsonRPC> jrpc, std::shared_ptr<ITranslationUnitStore> store, std::shared_ptr<IDiagnostics> diagnostics, std::shared_ptr<ICompletion> completion, std::shared_ptr<IDefinition> definition, std::shared_ptr<ITypeDefinition> typeDefinition, std::shared_ptr<IDeclaration> declaration);
 
 } // namespace ocls

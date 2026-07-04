@@ -77,6 +77,7 @@ set(headers
     diagnostics.hpp
     translation.hpp
     completion.hpp
+    declaration.hpp
     definition.hpp
     typedef.hpp
     location.hpp
@@ -90,6 +91,7 @@ set(sources
     diagnostics.cpp
     translation.cpp
     completion.cpp
+    declaration.cpp
     definition.cpp
     typedef.cpp
     location.cpp

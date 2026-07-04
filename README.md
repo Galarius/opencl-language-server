@@ -8,6 +8,7 @@
 - [x] [`textDocument/completion`](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_completion)
 - [x] [`textDocument/definition`](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.18/specification/#textDocument_definition)
 - [x] [`textDocument/typeDefinition`](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.18/specification/#textDocument_typeDefinition)
+- [x] [`textDocument/declaration`](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.18/specification/#textDocument_declaration)
 
 ## Prerequisites
 
@@ -72,7 +73,9 @@ SUBCOMMANDS:
   completion                  Provides an OpenCL kernel completions
   definition                  Resolves the definition location of a symbol at a given text
                               document position
-  typedef                     Resolve the type definition location of a symbol at a given text 
+  typedef                     Resolves the type definition location of a symbol at a given text 
+                              document position
+  declaration                 Resolves the declaration location of a symbol at a given text 
                               document position
 ```
 

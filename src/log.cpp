@@ -28,6 +28,7 @@ std::string LogName::diagnostics = "diagnostics";
 std::string LogName::completion = "completion";
 std::string LogName::definition = "definition";
 std::string LogName::typeDefinition = "typeDefinition";
+std::string LogName::declaration = "declaration";
 std::string LogName::jrpc = "jrpc";
 std::string LogName::lsp = "lsp";
 
@@ -59,6 +60,7 @@ void ConfigureLogging(bool fileLogging, const std::string& filename, spdlog::lev
             std::make_shared<spdlog::logger>(LogName::completion, sinks.begin(), sinks.end()),
             std::make_shared<spdlog::logger>(LogName::definition, sinks.begin(), sinks.end()),
             std::make_shared<spdlog::logger>(LogName::typeDefinition, sinks.begin(), sinks.end()),
+            std::make_shared<spdlog::logger>(LogName::declaration, sinks.begin(), sinks.end()),
             std::make_shared<spdlog::logger>(LogName::translation, sinks.begin(), sinks.end()),
             std::make_shared<spdlog::logger>(LogName::jrpc, sinks.begin(), sinks.end()),
             std::make_shared<spdlog::logger>(LogName::lsp, sinks.begin(), sinks.end())};
