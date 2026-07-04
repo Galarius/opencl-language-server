@@ -14,11 +14,6 @@
 class CompletionMock : public ocls::ICompletion
 {
 public:
-    MOCK_METHOD(void, OnFileOpen, (const std::string &, const std::string &), (override));
-    MOCK_METHOD(void, OnFileChange, (const std::string &, const std::string &), (override));
-    MOCK_METHOD(void, OnFileClose, (const std::string &), (override));
-    MOCK_METHOD(void, SetTranslationOptions, (const std::vector<std::string> &), (override));
-    MOCK_METHOD(void, SaveHeaders, (), (override));    
     MOCK_METHOD(
         std::vector<ocls::CompletionResult>, GetCompletions, (const std::string &, unsigned, unsigned), (override));
 };

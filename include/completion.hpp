@@ -7,6 +7,8 @@
 
 #pragma once
 
+#include "translation.hpp"
+
 #include <clinfo.hpp>
 
 #include <memory>
@@ -124,26 +126,6 @@ struct ICompletion
 {
     virtual ~ICompletion() = default;
 
-    virtual void OnFileOpen(const std::string &filePath, const std::string &content) = 0;
-    virtual void OnFileChange(const std::string &filePath, const std::string &content) = 0;
-    virtual void OnFileClose(const std::string &filePath) = 0;
-
-    /**
-     * Set the command-line arguments that would be
-     * passed to the \c clang executable if it were being invoked out-of-process.
-     * These command-line options will be parsed and will affect how the translation
-     * unit is parsed. Note that the following options are ignored: '-c',
-     * '-emit-ast', '-fsyntax-only' (which is the default), and '-o \<output file>'.
-     *
-     * \see BuildDefaultTranslationOptions
-     */
-    virtual void SetTranslationOptions(const std::vector<std::string> &options) = 0;
-
-    /**
-     * Saves embeded OpenCL headers to disk
-     */
-    virtual void SaveHeaders() = 0;
-
     /**
      * \note \c line and \c column are 1-based values
      */
@@ -151,10 +133,6 @@ struct ICompletion
         const std::string &filePath, unsigned line, unsigned column) = 0;
 };
 
-std::shared_ptr<ICompletion> CreateCompletion();
-
-std::vector<std::string> BuildDefaultTranslationOptions(const std::string &clStandard);
-
-std::string GetClangVersion();
+std::shared_ptr<ICompletion> CreateCompletion(std::shared_ptr<ITranslationUnitStore> store);
 
 } // namespace ocls

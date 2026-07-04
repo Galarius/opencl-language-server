@@ -23,6 +23,7 @@ namespace ocls {
 std::string LogName::main = "opencl-ls";
 std::string LogName::hdiscovery = "hdiscovery";
 std::string LogName::clinfo = "clinfo";
+std::string LogName::translation = "translation";
 std::string LogName::diagnostics = "diagnostics";
 std::string LogName::completion = "completion";
 std::string LogName::jrpc = "jrpc";

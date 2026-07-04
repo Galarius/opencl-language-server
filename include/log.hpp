@@ -17,6 +17,7 @@ struct LogName
     static std::string main;
     static std::string hdiscovery;
     static std::string clinfo;
+    static std::string translation;
     static std::string diagnostics;
     static std::string completion;
     static std::string jrpc;

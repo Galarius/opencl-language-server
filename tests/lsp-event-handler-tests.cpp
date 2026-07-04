@@ -26,6 +26,7 @@ class LSPTest : public ::testing::Test
 {
 protected:
     std::shared_ptr<JsonRPCMock> mockJsonRPC;
+    std::shared_ptr<TranslationUnitStoreMock> mockStore;
     std::shared_ptr<DiagnosticsMock> mockDiagnostics;
     std::shared_ptr<CompletionMock> mockCompletion;
     std::shared_ptr<GeneratorMock> mockGenerator;
@@ -35,6 +36,7 @@ protected:
     void SetUp() override
     {
         mockJsonRPC = std::make_shared<JsonRPCMock>();
+        mockStore = std::make_shared<TranslationUnitStoreMock>();
         mockDiagnostics = std::make_shared<DiagnosticsMock>();
         mockCompletion = std::make_shared<CompletionMock>();
         mockGenerator = std::make_shared<GeneratorMock>();
@@ -45,7 +47,7 @@ protected:
         ON_CALL(*mockGenerator, GenerateID()).WillByDefault(::testing::Return("12345678"));
         ON_CALL(*mockDiagnostics, GetDevice()).WillByDefault(::testing::Return(device));
 
-        handler = CreateLSPEventsHandler(mockJsonRPC, mockDiagnostics, mockCompletion, mockGenerator, mockExitHandler);
+        handler = CreateLSPEventsHandler(mockJsonRPC, mockStore, mockDiagnostics, mockCompletion, mockGenerator, mockExitHandler);
     }
 
     std::tuple<std::string, std::string> GetTestSource() const
