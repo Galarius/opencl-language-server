@@ -30,7 +30,7 @@ class OpenCLLanguageServerConanfile(ConanFile):
         "include/**",
         "libclang/**",
         "src/**",
-        "tests/**",
+        "res/**",
         "CMakeLists.txt",
         "version",
         "LICENSE",
