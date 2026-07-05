@@ -67,7 +67,7 @@ jobs:
           cd .build
           ctest --verbose --output-on-failure
       
-      - name: Run
+      - name: Create Conan package & Run CLI smoke tests
+        shell: bash
         run: |
-          .build\Release\opencl-language-server.exe clinfo -p
-          .build\Release\opencl-language-server.exe completion -k tests\fixtures\kernel.cl --cl-std cl1.2 --line 58 --column 20 --json
+          python3 build.py conan-create
