@@ -23,7 +23,7 @@ class Defaults(object):
     output_folder = ".conan-install"
     build_folder = ".build"
     current_architecture = map_uname_arch_to_conan_arch(machine)
-    libclang_cache_dir = str((Path(__file__).parent.parent.parent / ".libclang-cache").resolve())
+    libclang_cache_dir = str((Path(__file__).parent.parent.parent / ".libclang-cache").resolve().as_posix())
     default_host_profile = (
         f"profiles/{system}.{default_build_types.lower()}.{current_architecture}"
     )
