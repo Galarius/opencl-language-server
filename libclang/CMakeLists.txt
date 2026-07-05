@@ -74,7 +74,9 @@ message(STATUS "LIBCLANG HASH: ${libclang_hash}")
 include(FetchContent)
 set(FETCHCONTENT_QUIET OFF)
 
-set(LIBCLANG_CACHE_DIR "${CMAKE_SOURCE_DIR}/.libclang-cache")
+if(NOT DEFINED LIBCLANG_CACHE_DIR)
+  set(LIBCLANG_CACHE_DIR "${CMAKE_SOURCE_DIR}/.libclang-cache")
+endif()
 
 FetchContent_Declare(libclang
     SOURCE_DIR "${LIBCLANG_CACHE_DIR}/prebuild"

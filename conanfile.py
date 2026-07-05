@@ -2,8 +2,7 @@ from conan import ConanFile
 from conan.tools.build import check_min_cppstd
 from conan.tools.files import load, copy
 from conan.tools.apple import is_apple_os
-from conan.tools.cmake import CMake, cmake_layout
-
+from conan.tools.cmake import CMake, CMakeToolchain, cmake_layout
 
 import os
 
@@ -16,7 +15,7 @@ class OpenCLLanguageServerConanfile(ConanFile):
     homepage = "https://github.com/Galarius/opencl-language-server"
     topics = ("opencl", "language-server")
     settings = "os", "compiler", "build_type", "arch"
-    generators = "CMakeToolchain", "CMakeDeps", "VirtualBuildEnv"
+    generators = "CMakeDeps", "VirtualBuildEnv"
     options = {"enable_testing": [True, False]}
     default_options = {"enable_testing": False}
     requires = (
@@ -53,6 +52,13 @@ class OpenCLLanguageServerConanfile(ConanFile):
 
     def layout(self):
         cmake_layout(self)
+
+    def generate(self):
+        tc = CMakeToolchain(self)
+        libclang_cache_dir = os.environ.get("LIBCLANG_CACHE_DIR")
+        if libclang_cache_dir:
+            tc.cache_variables["LIBCLANG_CACHE_DIR"] = libclang_cache_dir
+        tc.generate()
 
     def build(self):
         cmake = CMake(self)

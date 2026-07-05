@@ -1,6 +1,6 @@
 from .execute import exec
 from .wrapper import Wrapper
-
+import os
 
 class Conan(Wrapper):
     def __init__(self):
@@ -22,15 +22,18 @@ class Conan(Wrapper):
             check=True,
         )
 
-    def create(self, host_profile, build_profile):
+    def create(self, host_profile, build_profile, cache_dir):
+        env = os.environ.copy()
+        env["LIBCLANG_CACHE_DIR"] = cache_dir
         exec(
             [
                 self.executable,
                 "create",
                 ".",
-                *self.__get_configuration_args(host_profile, build_profile),
+                *self.__get_configuration_args(host_profile, build_profile),                
             ],
             check=True,
+            env=env
         )
 
     def __get_configuration_args(self, host_profile, build_profile, with_tests=False):

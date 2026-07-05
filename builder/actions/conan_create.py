@@ -23,6 +23,13 @@ class ConanCreateAction(Action):
             default=Defaults.default_build_profile,
             help="a Conan profile to apply to the build machine [default: %(default)s]",
         )
+        subparser.add_argument(
+            "-c",
+            "--cache-dir",
+            type=str,
+            default=Defaults.libclang_cache_dir,
+            help="the path to the libclang cache directory [default: %(default)s]",
+        )
 
     def execute(self, args):
-        self.controller.create(args.host_profile, args.build_profile)
+        self.controller.create(args.host_profile, args.build_profile, args.cache_dir)
