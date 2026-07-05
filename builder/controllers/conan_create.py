@@ -7,9 +7,9 @@ class ConanCreateController(object):
     def __init__(self):
         self.conan = Conan()
 
-    def create(self, host_profile, build_profile):
+    def create(self, host_profile, build_profile, cache_dir):
         logging.debug(
-            f"Creating Conan package for profile host:'{host_profile}', build:'{build_profile}'..."
+            f"Creating Conan package for profile host:'{host_profile}', build:'{build_profile}', cache_dir:'{cache_dir}'..."
         )
         self.conan.check_availability()
-        self.conan.create(host_profile, build_profile)
+        self.conan.create(host_profile, build_profile, cache_dir)
